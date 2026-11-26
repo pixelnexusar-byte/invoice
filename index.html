@@ -6,6 +6,7 @@
   <title>De China al Mundo — Consolidación & Invoices</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     @media print {
       body * { visibility: hidden; }
@@ -66,11 +67,16 @@
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 class="text-2xl font-bold text-slate-900">Consolidación de Contenedores</h2>
-          <p class="text-sm text-slate-500">Gestioná contenedores, editá cargas por cliente y generá Invoices automáticas.</p>
+          <p class="text-sm text-slate-500">Gestioná contenedores, subí planillas Excel/CSV y generá Invoices automáticas.</p>
         </div>
-        <button onclick="openContainerModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-2 self-start">
-          + Nuevo Contenedor
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="openImportModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-2">
+            📥 Importar Excel / CSV
+          </button>
+          <button onclick="openContainerModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-2">
+            + Nuevo Contenedor
+          </button>
+        </div>
       </div>
 
       <!-- Selector de Contenedores -->
@@ -89,6 +95,9 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openImportModal(currentContainer?.id)" class="px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-900">
+              📥 Importar Excel aquí
+            </button>
             <button onclick="openContainerModal(currentContainer)" class="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700">
               ✏️ Editar Contenedor
             </button>
@@ -170,6 +179,38 @@
 
   </main>
 
+  <!-- MODAL IMPORTAR EXCEL / CSV -->
+  <div id="modal-import" class="hidden fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-xl max-w-xl w-full p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900 mb-1">Importar Mercadería desde Excel / CSV</h3>
+      <p class="text-xs text-slate-500 mb-4">Reconoce automáticamente hojas como <strong>Detalle mercadería</strong> y columnas de cliente, descripción, HS code, cantidad, precio, peso, CBM y marca.</p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Contenedor Destino *</label>
+          <select id="import-container-select" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Seleccionar Archivo (.xlsx, .xls, .csv)</label>
+          <input id="import-file-input" type="file" accept=".xlsx,.xls,.csv" onchange="handleExcelFile(event)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-red-50 file:text-red-700 hover:file:bg-red-100" />
+        </div>
+
+        <div id="import-preview" class="hidden bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-1">
+          <p class="font-bold text-slate-800" id="import-summary"></p>
+          <p class="text-slate-500" id="import-clients-list"></p>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+          <button id="btn-confirm-import" type="button" onclick="confirmExcelImport()" disabled class="px-5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 disabled:bg-slate-300 text-white hover:bg-emerald-700">
+            Subir a Supabase
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL CREAR / EDITAR CONTENEDOR -->
   <div id="modal-container" class="hidden fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center p-4 no-print">
     <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl">
@@ -237,7 +278,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cliente / Consignatario *</label>
-            <input id="cargo-client" type="text" required placeholder="Ej: Juan Pérez / Importadora SRL" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+            <input id="cargo-client" type="text" required placeholder="Ej: Adrian DAmore" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CUIT / DNI del Cliente</label>
@@ -252,11 +293,11 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="sm:col-span-2">
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción de Mercadería *</label>
-            <input id="cargo-desc" type="text" required placeholder="Ej: Accesorios para celulares / Repuestos" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <input id="cargo-desc" type="text" required placeholder="Ej: Termotanque eléctrico vertical" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">NCM / HS Code</label>
-            <input id="cargo-hs" type="text" placeholder="8517.79.00" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <input id="cargo-hs" type="text" placeholder="8516100010" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </div>
 
@@ -295,7 +336,6 @@
   <!-- MODAL / VISTA PREVIA DE COMMERCIAL INVOICE -->
   <div id="modal-invoice" class="hidden fixed inset-0 bg-slate-900/70 z-50 overflow-y-auto p-4">
     <div class="max-w-4xl mx-auto my-6">
-      <!-- Barra superior de controles (No se imprime) -->
       <div class="bg-slate-800 text-white px-6 py-3 rounded-t-xl flex flex-wrap items-center justify-between gap-3 no-print">
         <div class="flex items-center gap-3">
           <span class="font-bold text-sm">Vista Previa Commercial Invoice</span>
@@ -317,10 +357,7 @@
         </div>
       </div>
 
-      <!-- HOJA A4 IMPRIMIBLE -->
-      <div id="invoice-print-area" class="bg-white p-10 shadow-2xl rounded-b-xl text-slate-900">
-        <!-- Se llena dinámicamente -->
-      </div>
+      <div id="invoice-print-area" class="bg-white p-10 shadow-2xl rounded-b-xl text-slate-900"></div>
     </div>
   </div>
 
@@ -331,10 +368,10 @@
     let currentCargoItems = [];
     let companySettings = {};
     let activeInvoiceClient = null;
+    let parsedImportRows = [];
 
     const CAPACITIES = { '20GP': 33, '40GP': 67, '40HQ': 76, '45HQ': 86 };
 
-    // Inicializar
     async function init() {
       await loadCompanySettings();
       await loadContainers();
@@ -404,7 +441,7 @@
       const grid = document.getElementById('containers-grid');
       if (containers.length === 0) {
         grid.innerHTML = `<div class="col-span-3 bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-500">
-          No hay contenedores cargados aún. Hacé clic en <strong>"+ Nuevo Contenedor"</strong> para empezar.
+          No hay contenedores cargados aún. Hacé clic en <strong>"+ Nuevo Contenedor"</strong> o <strong>"Importar Excel / CSV"</strong>.
         </div>`;
         return;
       }
@@ -455,7 +492,6 @@
         return;
       }
 
-      // Agrupar por cliente
       const grouped = {};
       currentCargoItems.forEach(item => {
         const key = item.client_name.trim();
@@ -519,6 +555,140 @@
           </div>
         `;
       }).join('');
+    }
+
+    // --- IMPORTADOR EXCEL / CSV ---
+    function openImportModal(preselectedContainerId = null) {
+      if (containers.length === 0) {
+        return alert('Primero creá al menos un contenedor para asignar la carga.');
+      }
+      parsedImportRows = [];
+      document.getElementById('import-file-input').value = '';
+      document.getElementById('import-preview').classList.add('hidden');
+      document.getElementById('btn-confirm-import').disabled = true;
+
+      const select = document.getElementById('import-container-select');
+      select.innerHTML = containers.map(c => `<option value="${c.id}">${c.container_number} (${c.container_type})</option>`).join('');
+      if (preselectedContainerId) select.value = preselectedContainerId;
+      else if (currentContainer) select.value = currentContainer.id;
+
+      document.getElementById('modal-import').classList.remove('hidden');
+    }
+
+    function parseNumberSafe(val, fallback = 0) {
+      if (typeof val === 'number') return Number.isFinite(val) ? val : fallback;
+      if (!val) return fallback;
+      const match = String(val).replace(',', '.').match(/-?\d+(\.\d+)?/);
+      return match ? parseFloat(match[0]) : fallback;
+    }
+
+    function handleExcelFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          const targetSheetName = workbook.SheetNames.find(n =>
+            n.toLowerCase().includes('detalle') || n.toLowerCase().includes('mercader')
+          ) || workbook.SheetNames[0];
+
+          const sheet = workbook.Sheets[targetSheetName];
+          const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          // Buscar fila de encabezados
+          let headerRowIndex = rawRows.findIndex(row =>
+            row.some(cell => String(cell).toLowerCase().includes('cliente') || String(cell).toLowerCase().includes('descrip'))
+          );
+          if (headerRowIndex === -1) headerRowIndex = 0;
+
+          const headers = rawRows[headerRowIndex].map(h => String(h).trim().toLowerCase());
+          const colIdx = (patterns) => headers.findIndex(h => patterns.some(p => h.includes(p)));
+
+          const idxClient = colIdx(['cliente', 'consignatario', 'client']);
+          const idxDesc = colIdx(['descrip', 'producto', 'mercader', 'item']);
+          const idxHs = colIdx(['hs', 'ncm', 'arancel']);
+          const idxQty = colIdx(['cantidad', 'bultos', 'pkgs', 'qty']);
+          const idxPrice = colIdx(['precio unit', 'unit price', 'unitario']);
+          const idxTotal = colIdx(['valor total', 'total (usd)', 'amount']);
+          const idxWeight = colIdx(['peso bruto', 'gross', 'peso']);
+          const idxCbm = colIdx(['cbm', 'volumen', 'vol']);
+          const idxMark = colIdx(['marca', 'embalaje', 'mark']);
+
+          const items = [];
+          for (let r = headerRowIndex + 1; r < rawRows.length; r++) {
+            const row = rawRows[r];
+            const clientName = idxClient >= 0 ? String(row[idxClient] || '').trim() : '';
+            const description = idxDesc >= 0 ? String(row[idxDesc] || '').trim() : '';
+
+            if (!clientName || !description) continue;
+
+            const rawQty = idxQty >= 0 ? row[idxQty] : 1;
+            const packages = Math.max(1, Math.round(parseNumberSafe(rawQty, 1)));
+            const grossWeight = parseNumberSafe(idxWeight >= 0 ? row[idxWeight] : 0, 0);
+            const cbm = parseNumberSafe(idxCbm >= 0 ? row[idxCbm] : 0, 0);
+
+            let unitPrice = parseNumberSafe(idxPrice >= 0 ? row[idxPrice] : 0, 0);
+            const totalVal = parseNumberSafe(idxTotal >= 0 ? row[idxTotal] : 0, 0);
+            if (unitPrice === 0 && totalVal > 0 && packages > 0) {
+              unitPrice = Number((totalVal / packages).toFixed(4));
+            }
+
+            const rawHs = idxHs >= 0 ? String(row[idxHs] || '').trim() : '';
+            const rawMark = idxMark >= 0 ? String(row[idxMark] || '').trim() : '';
+            const extraNote = typeof rawQty === 'string' && isNaN(Number(rawQty)) && rawQty.trim() ? ` (${rawQty.trim()})` : '';
+
+            items.push({
+              client_name: clientName,
+              client_tax_id: '',
+              client_address: '',
+              description: description + extraNote,
+              hs_code: rawHs,
+              packages,
+              gross_weight: grossWeight,
+              cbm,
+              unit_price: unitPrice,
+              shipping_mark: rawMark || 'DE CHINA AL MUNDO'
+            });
+          }
+
+          parsedImportRows = items;
+          const uniqueClients = [...new Set(items.map(i => i.client_name))];
+
+          const previewEl = document.getElementById('import-preview');
+          previewEl.classList.remove('hidden');
+          document.getElementById('import-summary').textContent =
+            `Hoja "${targetSheetName}": ${items.length} ítems listos para importar.`;
+          document.getElementById('import-clients-list').textContent =
+            `Clientes detectados (${uniqueClients.length}): ${uniqueClients.join(', ') || 'Ninguno'}`;
+
+          document.getElementById('btn-confirm-import').disabled = items.length === 0;
+        } catch (err) {
+          alert('No se pudo leer el archivo: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    async function confirmExcelImport() {
+      const containerId = document.getElementById('import-container-select').value;
+      if (!containerId || parsedImportRows.length === 0) return;
+
+      const payload = parsedImportRows.map(item => ({
+        ...item,
+        container_id: containerId
+      }));
+
+      const { error } = await sb.from('cargo_items').insert(payload);
+      if (error) return alert('Error al subir a Supabase: ' + error.message);
+
+      alert(`¡Listo! Se importaron ${payload.length} ítems a Supabase.`);
+      closeModals();
+      const targetCont = containers.find(c => c.id === containerId);
+      if (targetCont) await selectContainer(targetCont);
     }
 
     // --- MODALES Y CRUD ---
@@ -709,6 +879,7 @@
     }
 
     function closeModals() {
+      document.getElementById('modal-import').classList.add('hidden');
       document.getElementById('modal-container').classList.add('hidden');
       document.getElementById('modal-cargo').classList.add('hidden');
       document.getElementById('modal-invoice').classList.add('hidden');
