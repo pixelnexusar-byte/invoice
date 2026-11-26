@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>De China al Mundo — Consolidación & Invoices</title>
+  <title>De China al Mundo — Consolidación, Packing List & Invoices</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     @media print {
       body * { visibility: hidden; }
-      #invoice-print-area, #invoice-print-area * { visibility: visible; }
-      #invoice-print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; box-shadow: none !important; }
+      .print-target, .print-target * { visibility: visible; }
+      .print-target { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; box-shadow: none !important; }
       .no-print { display: none !important; }
     }
   </style>
@@ -27,10 +27,10 @@
 
   <!-- NAVBAR -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm no-print">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <!-- Logo SVG De China al Mundo -->
-        <svg class="w-11 h-11" viewBox="0 0 200 160" fill="none">
+        <svg class="w-11 h-11 shrink-0" viewBox="0 0 200 160" fill="none">
           <path d="M25 85 C 15 135, 185 135, 165 65 C 175 120, 30 120, 25 85 Z" fill="#EAB308"/>
           <path d="M60 45 L100 35 L140 45 L100 52 Z" fill="#DC2626"/>
           <ellipse cx="100" cy="42" rx="14" ry="18" fill="#DC2626"/>
@@ -48,11 +48,14 @@
         </div>
       </div>
 
-      <nav class="flex items-center gap-2">
-        <button onclick="switchTab('containers')" id="tab-containers" class="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white shadow-sm">
+      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <button onclick="switchTab('containers')" id="tab-containers" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-red-600 text-white shadow-sm">
           Contenedores y Carga
         </button>
-        <button onclick="switchTab('company')" id="tab-company" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100">
+        <button onclick="switchTab('packing')" id="tab-packing" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100">
+          Packing List / Mercadería
+        </button>
+        <button onclick="switchTab('company')" id="tab-company" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100">
           Datos Empresa
         </button>
       </nav>
@@ -79,10 +82,8 @@
         </div>
       </div>
 
-      <!-- Selector de Contenedores -->
       <div id="containers-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"></div>
 
-      <!-- Detalle del Contenedor Seleccionado -->
       <div id="container-detail" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="p-6 border-b border-slate-200 bg-slate-50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
@@ -110,7 +111,6 @@
           </div>
         </div>
 
-        <!-- Barra de Ocupación CBM -->
         <div class="px-6 py-4 bg-white border-b border-slate-100">
           <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1.5">
             <span>Ocupación Total del Contenedor</span>
@@ -121,12 +121,54 @@
           </div>
         </div>
 
-        <!-- Clientes Consolidados Agrupados -->
         <div id="clients-grouped-list" class="p-6 space-y-6"></div>
       </div>
     </section>
 
-    <!-- VISTA 2: DATOS DE LA EMPRESA -->
+    <!-- VISTA 2: PACKING LIST / LISTADO COMPLETO DE MERCADERÍA -->
+    <section id="view-packing" class="hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Desglose de Mercadería (Packing List)</h2>
+          <p class="text-sm text-slate-500">Listado completo por ítem, lote, cliente, seguimiento, descripción, HS code y cantidad.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <select id="packing-container-filter" onchange="loadPackingList()" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm font-medium">
+            <option value="ALL">Todos los contenedores</option>
+          </select>
+          <input id="packing-search" type="text" oninput="renderPackingTable()" placeholder="Buscar cliente, tracking o descripción..." class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm w-64" />
+          <button onclick="printPackingList()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+            🖨️ Imprimir Desglose
+          </button>
+        </div>
+      </div>
+
+      <div id="packing-print-area" class="print-target bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+          <span id="packing-count-label" class="font-bold text-slate-800">0 ítems</span>
+          <span id="packing-total-qty-label" class="font-bold text-red-700">Cantidad total: 0</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr class="bg-slate-900 text-white text-xs uppercase">
+                <th class="px-4 py-3">Ítem</th>
+                <th class="px-4 py-3">Lote</th>
+                <th class="px-4 py-3">Cliente / consignatario</th>
+                <th class="px-4 py-3">N° seguimiento / referencia</th>
+                <th class="px-4 py-3">Descripción</th>
+                <th class="px-4 py-3">Código HS</th>
+                <th class="px-4 py-3 text-right">Cantidad</th>
+                <th class="px-4 py-3 text-center no-print">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="packing-table-body" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISTA 3: DATOS DE LA EMPRESA -->
     <section id="view-company" class="hidden max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <h2 class="text-xl font-bold text-slate-900 mb-1">Configuración de De China al Mundo</h2>
       <p class="text-sm text-slate-500 mb-6">Estos datos aparecen en el encabezado y pie de todas las Invoices generadas.</p>
@@ -183,7 +225,7 @@
   <div id="modal-import" class="hidden fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center p-4 no-print">
     <div class="bg-white rounded-xl max-w-xl w-full p-6 shadow-xl">
       <h3 class="text-lg font-bold text-slate-900 mb-1">Importar Mercadería desde Excel / CSV</h3>
-      <p class="text-xs text-slate-500 mb-4">Reconoce automáticamente hojas como <strong>Detalle mercadería</strong> y columnas de cliente, descripción, HS code, cantidad, precio, peso, CBM y marca.</p>
+      <p class="text-xs text-slate-500 mb-4">Reconoce automáticamente hojas como <strong>Detalle mercadería</strong> y columnas de lote, cliente, seguimiento, descripción, HS code, cantidad, precio, peso y CBM.</p>
 
       <div class="space-y-4">
         <div>
@@ -275,10 +317,18 @@
       <h3 id="modal-cargo-title" class="text-lg font-bold text-slate-900 mb-4">Agregar Mercadería al Contenedor</h3>
       <form onsubmit="saveCargoItem(event)" class="space-y-4">
         <input type="hidden" id="cargo-id" />
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cliente / Consignatario *</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Lote</label>
+            <input id="cargo-lot" type="text" placeholder="Ej: 1" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cliente / consignatario *</label>
             <input id="cargo-client" type="text" required placeholder="Ej: Adrian DAmore" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div class="sm:col-span-3">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">N° seguimiento / referencia</label>
+            <input id="cargo-tracking" type="text" placeholder="Ej: #315642502501021139" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CUIT / DNI del Cliente</label>
@@ -292,18 +342,18 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="sm:col-span-2">
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción de Mercadería *</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción *</label>
             <input id="cargo-desc" type="text" required placeholder="Ej: Termotanque eléctrico vertical" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">NCM / HS Code</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Código HS</label>
             <input id="cargo-hs" type="text" placeholder="8516100010" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
           </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Bultos / Cajas *</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cantidad *</label>
             <input id="cargo-pkg" type="number" min="1" required value="1" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
           </div>
           <div>
@@ -348,7 +398,7 @@
           <input id="inv-freight" type="number" step="0.01" value="0" onchange="renderInvoicePreview()" placeholder="Flete Extra USD" class="bg-slate-700 text-white text-xs rounded px-2 py-1 w-32 border border-slate-600" />
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="window.print()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">
+          <button onclick="printInvoice()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">
             🖨️ Imprimir / Guardar PDF
           </button>
           <button onclick="closeModals()" class="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
@@ -366,6 +416,7 @@
     let containers = [];
     let currentContainer = null;
     let currentCargoItems = [];
+    let packingAllItems = [];
     let companySettings = {};
     let activeInvoiceClient = null;
     let parsedImportRows = [];
@@ -379,13 +430,95 @@
 
     function switchTab(tab) {
       document.getElementById('view-containers').classList.toggle('hidden', tab !== 'containers');
+      document.getElementById('view-packing').classList.toggle('hidden', tab !== 'packing');
       document.getElementById('view-company').classList.toggle('hidden', tab !== 'company');
-      document.getElementById('tab-containers').className = tab === 'containers'
-        ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white shadow-sm'
-        : 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100';
-      document.getElementById('tab-company').className = tab === 'company'
-        ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white shadow-sm'
-        : 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100';
+
+      const activeCls = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-red-600 text-white shadow-sm';
+      const inactiveCls = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100';
+
+      document.getElementById('tab-containers').className = tab === 'containers' ? activeCls : inactiveCls;
+      document.getElementById('tab-packing').className = tab === 'packing' ? activeCls : inactiveCls;
+      document.getElementById('tab-company').className = tab === 'company' ? activeCls : inactiveCls;
+
+      if (tab === 'packing') {
+        populatePackingFilter();
+        loadPackingList();
+      }
+    }
+
+    // --- PACKING LIST DESGLOSADO ---
+    function populatePackingFilter() {
+      const sel = document.getElementById('packing-container-filter');
+      const prev = sel.value;
+      sel.innerHTML = `<option value="ALL">Todos los contenedores</option>` +
+        containers.map(c => `<option value="${c.id}">${c.container_number} (${c.container_type})</option>`).join('');
+      if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+      else if (currentContainer) sel.value = currentContainer.id;
+    }
+
+    async function loadPackingList() {
+      const filterId = document.getElementById('packing-container-filter').value;
+      let query = sb.from('cargo_items').select('*').order('created_at', { ascending: true });
+      if (filterId && filterId !== 'ALL') {
+        query = query.eq('container_id', filterId);
+      }
+      const { data, error } = await query;
+      if (error) return console.error(error);
+      packingAllItems = data || [];
+      renderPackingTable();
+    }
+
+    function renderPackingTable() {
+      const term = (document.getElementById('packing-search').value || '').trim().toLowerCase();
+      const filtered = packingAllItems.filter(i => {
+        if (!term) return true;
+        return (
+          String(i.lot_number || '').toLowerCase().includes(term) ||
+          String(i.client_name || '').toLowerCase().includes(term) ||
+          String(i.tracking_ref || '').toLowerCase().includes(term) ||
+          String(i.description || '').toLowerCase().includes(term) ||
+          String(i.hs_code || '').toLowerCase().includes(term)
+        );
+      });
+
+      const totalQty = filtered.reduce((acc, i) => acc + Number(i.packages || 0), 0);
+      document.getElementById('packing-count-label').textContent = `${filtered.length} ítems`;
+      document.getElementById('packing-total-qty-label').textContent = `Cantidad total: ${totalQty}`;
+
+      const tbody = document.getElementById('packing-table-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">No hay mercadería para mostrar.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((item, idx) => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-2.5 font-semibold text-slate-700">${idx + 1}</td>
+          <td class="px-4 py-2.5 text-slate-700">${item.lot_number || '-'}</td>
+          <td class="px-4 py-2.5 font-semibold text-slate-900">${item.client_name}</td>
+          <td class="px-4 py-2.5 text-slate-600 font-mono text-xs">${item.tracking_ref || '-'}</td>
+          <td class="px-4 py-2.5 text-slate-800">${item.description}</td>
+          <td class="px-4 py-2.5 text-slate-600 text-xs">${item.hs_code || '-'}</td>
+          <td class="px-4 py-2.5 text-right font-bold text-slate-900">${item.packages}</td>
+          <td class="px-4 py-2.5 text-center whitespace-nowrap no-print">
+            <button onclick='openCargoModal(${JSON.stringify(item)})' class="text-blue-600 hover:underline text-xs font-semibold mr-2">Editar</button>
+            <button onclick="deleteCargoItem('${item.id}')" class="text-red-600 hover:underline text-xs font-semibold">Borrar</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function printPackingList() {
+      const inv = document.getElementById('invoice-print-area');
+      inv.classList.remove('print-target');
+      document.getElementById('packing-print-area').classList.add('print-target');
+      window.print();
+    }
+
+    function printInvoice() {
+      document.getElementById('packing-print-area').classList.remove('print-target');
+      document.getElementById('invoice-print-area').classList.add('print-target');
+      window.print();
     }
 
     // --- DATOS EMPRESA ---
@@ -523,12 +656,13 @@
               <table class="w-full text-left text-sm">
                 <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                   <tr>
+                    <th class="px-4 py-2.5">Lote</th>
+                    <th class="px-4 py-2.5">Seguimiento</th>
                     <th class="px-4 py-2.5">Descripción</th>
                     <th class="px-4 py-2.5">HS Code</th>
-                    <th class="px-4 py-2.5 text-right">Bultos</th>
+                    <th class="px-4 py-2.5 text-right">Cant.</th>
                     <th class="px-4 py-2.5 text-right">Peso (KG)</th>
                     <th class="px-4 py-2.5 text-right">CBM</th>
-                    <th class="px-4 py-2.5 text-right">Unit. USD</th>
                     <th class="px-4 py-2.5 text-right">Total USD</th>
                     <th class="px-4 py-2.5 text-center">Acciones</th>
                   </tr>
@@ -536,12 +670,13 @@
                 <tbody class="divide-y divide-slate-100">
                   ${items.map(item => `
                     <tr class="hover:bg-slate-50">
+                      <td class="px-4 py-2.5 text-slate-600 text-xs">${item.lot_number || '-'}</td>
+                      <td class="px-4 py-2.5 text-slate-500 font-mono text-xs">${item.tracking_ref || '-'}</td>
                       <td class="px-4 py-2.5 font-medium text-slate-800">${item.description}</td>
                       <td class="px-4 py-2.5 text-slate-500 text-xs">${item.hs_code || '-'}</td>
-                      <td class="px-4 py-2.5 text-right">${item.packages}</td>
+                      <td class="px-4 py-2.5 text-right font-semibold">${item.packages}</td>
                       <td class="px-4 py-2.5 text-right">${Number(item.gross_weight).toFixed(2)}</td>
                       <td class="px-4 py-2.5 text-right">${Number(item.cbm).toFixed(3)}</td>
-                      <td class="px-4 py-2.5 text-right">$${Number(item.unit_price).toFixed(2)}</td>
                       <td class="px-4 py-2.5 text-right font-semibold">$${Number(item.total_value).toFixed(2)}</td>
                       <td class="px-4 py-2.5 text-center whitespace-nowrap">
                         <button onclick='openCargoModal(${JSON.stringify(item)})' class="text-blue-600 hover:underline text-xs font-semibold mr-2">Editar</button>
@@ -599,7 +734,6 @@
           const sheet = workbook.Sheets[targetSheetName];
           const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-          // Buscar fila de encabezados
           let headerRowIndex = rawRows.findIndex(row =>
             row.some(cell => String(cell).toLowerCase().includes('cliente') || String(cell).toLowerCase().includes('descrip'))
           );
@@ -608,7 +742,9 @@
           const headers = rawRows[headerRowIndex].map(h => String(h).trim().toLowerCase());
           const colIdx = (patterns) => headers.findIndex(h => patterns.some(p => h.includes(p)));
 
+          const idxLot = colIdx(['lote', 'lot']);
           const idxClient = colIdx(['cliente', 'consignatario', 'client']);
+          const idxTracking = colIdx(['seguimiento', 'referencia', 'tracking', 'ref']);
           const idxDesc = colIdx(['descrip', 'producto', 'mercader', 'item']);
           const idxHs = colIdx(['hs', 'ncm', 'arancel']);
           const idxQty = colIdx(['cantidad', 'bultos', 'pkgs', 'qty']);
@@ -626,6 +762,8 @@
 
             if (!clientName || !description) continue;
 
+            const lotNumber = idxLot >= 0 ? String(row[idxLot] || '').trim() : '';
+            const trackingRef = idxTracking >= 0 ? String(row[idxTracking] || '').trim() : '';
             const rawQty = idxQty >= 0 ? row[idxQty] : 1;
             const packages = Math.max(1, Math.round(parseNumberSafe(rawQty, 1)));
             const grossWeight = parseNumberSafe(idxWeight >= 0 ? row[idxWeight] : 0, 0);
@@ -642,7 +780,9 @@
             const extraNote = typeof rawQty === 'string' && isNaN(Number(rawQty)) && rawQty.trim() ? ` (${rawQty.trim()})` : '';
 
             items.push({
+              lot_number: lotNumber,
               client_name: clientName,
+              tracking_ref: trackingRef,
               client_tax_id: '',
               client_address: '',
               description: description + extraNote,
@@ -689,6 +829,9 @@
       closeModals();
       const targetCont = containers.find(c => c.id === containerId);
       if (targetCont) await selectContainer(targetCont);
+      if (!document.getElementById('view-packing').classList.contains('hidden')) {
+        await loadPackingList();
+      }
     }
 
     // --- MODALES Y CRUD ---
@@ -739,7 +882,9 @@
     function openCargoModal(item = null) {
       document.getElementById('modal-cargo-title').textContent = item ? 'Editar Mercadería' : 'Agregar Mercadería al Contenedor';
       document.getElementById('cargo-id').value = item ? item.id : '';
+      document.getElementById('cargo-lot').value = item ? (item.lot_number || '') : '';
       document.getElementById('cargo-client').value = item ? item.client_name : '';
+      document.getElementById('cargo-tracking').value = item ? (item.tracking_ref || '') : '';
       document.getElementById('cargo-tax').value = item ? (item.client_tax_id || '') : '';
       document.getElementById('cargo-address').value = item ? (item.client_address || '') : '';
       document.getElementById('cargo-desc').value = item ? item.description : '';
@@ -755,9 +900,17 @@
     async function saveCargoItem(e) {
       e.preventDefault();
       const id = document.getElementById('cargo-id').value;
+      const targetContainerId = id
+        ? (packingAllItems.find(i => i.id === id)?.container_id || currentContainer?.id)
+        : currentContainer?.id;
+
+      if (!targetContainerId) return alert('Seleccioná un contenedor primero.');
+
       const payload = {
-        container_id: currentContainer.id,
+        container_id: targetContainerId,
+        lot_number: document.getElementById('cargo-lot').value.trim(),
         client_name: document.getElementById('cargo-client').value.trim(),
+        tracking_ref: document.getElementById('cargo-tracking').value.trim(),
         client_tax_id: document.getElementById('cargo-tax').value.trim(),
         client_address: document.getElementById('cargo-address').value.trim(),
         description: document.getElementById('cargo-desc').value.trim(),
@@ -775,14 +928,22 @@
 
       if (error) return alert('Error al guardar mercadería: ' + error.message);
       closeModals();
-      await selectContainer(currentContainer);
+      if (currentContainer && currentContainer.id === targetContainerId) {
+        await selectContainer(currentContainer);
+      }
+      if (!document.getElementById('view-packing').classList.contains('hidden')) {
+        await loadPackingList();
+      }
     }
 
     async function deleteCargoItem(id) {
       if (!confirm('¿Eliminar este ítem de mercadería?')) return;
       const { error } = await sb.from('cargo_items').delete().eq('id', id);
       if (error) return alert('Error: ' + error.message);
-      await selectContainer(currentContainer);
+      if (currentContainer) await selectContainer(currentContainer);
+      if (!document.getElementById('view-packing').classList.contains('hidden')) {
+        await loadPackingList();
+      }
     }
 
     // --- GENERADOR DE INVOICE ---
