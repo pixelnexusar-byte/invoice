@@ -7,6 +7,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
   <style>
     @media print {
       body * { visibility: hidden; }
@@ -125,20 +127,23 @@
       </div>
     </section>
 
-    <!-- VISTA 2: PACKING LIST / LISTADO COMPLETO DE MERCADERÍA -->
+    <!-- VISTA 2: PACKING LIST / DESGLOSE DE MERCADERÍA -->
     <section id="view-packing" class="hidden">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h2 class="text-2xl font-bold text-slate-900">Desglose de Mercadería (Packing List)</h2>
-          <p class="text-sm text-slate-500">Listado completo por ítem, lote, cliente, seguimiento, descripción, HS code y cantidad.</p>
+          <p class="text-sm text-slate-500">Listado completo por ítem, lote, cliente, seguimiento, descripción, código HS y cantidad.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <select id="packing-container-filter" onchange="loadPackingList()" class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm font-medium">
             <option value="ALL">Todos los contenedores</option>
           </select>
-          <input id="packing-search" type="text" oninput="renderPackingTable()" placeholder="Buscar cliente, tracking o descripción..." class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm w-64" />
-          <button onclick="printPackingList()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-            🖨️ Imprimir Desglose
+          <input id="packing-search" type="text" oninput="renderPackingTable()" placeholder="Buscar cliente, tracking o descripción..." class="border border-slate-300 bg-white rounded-lg px-3 py-2 text-sm w-60" />
+          <button onclick="exportPackingExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold">
+            📊 Exportar Excel
+          </button>
+          <button onclick="printPackingList()" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-lg text-sm font-semibold">
+            🖨️ Imprimir
           </button>
         </div>
       </div>
@@ -388,7 +393,7 @@
     <div class="max-w-4xl mx-auto my-6">
       <div class="bg-slate-800 text-white px-6 py-3 rounded-t-xl flex flex-wrap items-center justify-between gap-3 no-print">
         <div class="flex items-center gap-3">
-          <span class="font-bold text-sm">Vista Previa Commercial Invoice</span>
+          <span class="font-bold text-sm">Commercial Invoice</span>
           <select id="inv-incoterm" onchange="renderInvoicePreview()" class="bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600">
             <option value="FOB">Incoterm: FOB</option>
             <option value="CIF">Incoterm: CIF</option>
@@ -397,11 +402,17 @@
           </select>
           <input id="inv-freight" type="number" step="0.01" value="0" onchange="renderInvoicePreview()" placeholder="Flete Extra USD" class="bg-slate-700 text-white text-xs rounded px-2 py-1 w-32 border border-slate-600" />
         </div>
-        <div class="flex items-center gap-2">
-          <button onclick="printInvoice()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">
-            🖨️ Imprimir / Guardar PDF
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="downloadInvoicePDF()" class="bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold">
+            📄 Descargar PDF
           </button>
-          <button onclick="closeModals()" class="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+          <button onclick="exportInvoiceExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold">
+            📊 Exportar Excel
+          </button>
+          <button onclick="printInvoice()" class="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+            🖨️ Imprimir
+          </button>
+          <button onclick="closeModals()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
             Cerrar
           </button>
         </div>
@@ -419,6 +430,7 @@
     let packingAllItems = [];
     let companySettings = {};
     let activeInvoiceClient = null;
+    let activeInvoiceMeta = null;
     let parsedImportRows = [];
 
     const CAPACITIES = { '20GP': 33, '40GP': 67, '40HQ': 76, '45HQ': 86 };
@@ -468,9 +480,9 @@
       renderPackingTable();
     }
 
-    function renderPackingTable() {
+    function getFilteredPackingItems() {
       const term = (document.getElementById('packing-search').value || '').trim().toLowerCase();
-      const filtered = packingAllItems.filter(i => {
+      return packingAllItems.filter(i => {
         if (!term) return true;
         return (
           String(i.lot_number || '').toLowerCase().includes(term) ||
@@ -480,7 +492,10 @@
           String(i.hs_code || '').toLowerCase().includes(term)
         );
       });
+    }
 
+    function renderPackingTable() {
+      const filtered = getFilteredPackingItems();
       const totalQty = filtered.reduce((acc, i) => acc + Number(i.packages || 0), 0);
       document.getElementById('packing-count-label').textContent = `${filtered.length} ítems`;
       document.getElementById('packing-total-qty-label').textContent = `Cantidad total: ${totalQty}`;
@@ -508,9 +523,28 @@
       `).join('');
     }
 
+    function exportPackingExcel() {
+      const filtered = getFilteredPackingItems();
+      if (filtered.length === 0) return alert('No hay ítems para exportar.');
+
+      const rows = filtered.map((item, idx) => ({
+        'Ítem': idx + 1,
+        'Lote': item.lot_number || '',
+        'Cliente / consignatario': item.client_name || '',
+        'N° seguimiento / referencia': item.tracking_ref || '',
+        'Descripción': item.description || '',
+        'Código HS': item.hs_code || '',
+        'Cantidad': Number(item.packages || 0)
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Packing List');
+      XLSX.writeFile(wb, `Packing_List_De_China_Al_Mundo_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }
+
     function printPackingList() {
-      const inv = document.getElementById('invoice-print-area');
-      inv.classList.remove('print-target');
+      document.getElementById('invoice-print-area').classList.remove('print-target');
       document.getElementById('packing-print-area').classList.add('print-target');
       window.print();
     }
@@ -946,22 +980,35 @@
       }
     }
 
-    // --- GENERADOR DE INVOICE ---
+    // --- GENERADOR DE INVOICE + EXPORTACIÓN PDF / EXCEL ---
     function openInvoiceModal(clientName) {
       activeInvoiceClient = clientName;
+      activeInvoiceMeta = null;
       document.getElementById('modal-invoice').classList.remove('hidden');
       renderInvoicePreview();
     }
 
-    function renderInvoicePreview() {
+    function getActiveInvoiceData() {
       const items = currentCargoItems.filter(i => i.client_name.trim() === activeInvoiceClient);
       const clientInfo = items[0] || {};
       const incoterm = document.getElementById('inv-incoterm').value;
       const freight = parseFloat(document.getElementById('inv-freight').value) || 0;
       const subtotal = items.reduce((s, i) => s + Number(i.total_value), 0);
       const grandTotal = subtotal + freight;
-      const today = new Date().toLocaleDateString('es-AR');
-      const invNumber = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      if (!activeInvoiceMeta || activeInvoiceMeta.client !== activeInvoiceClient) {
+        activeInvoiceMeta = {
+          client: activeInvoiceClient,
+          invNumber: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          today: new Date().toLocaleDateString('es-AR')
+        };
+      }
+
+      return { items, clientInfo, incoterm, freight, subtotal, grandTotal, ...activeInvoiceMeta };
+    }
+
+    function renderInvoicePreview() {
+      const { items, clientInfo, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
 
       document.getElementById('invoice-print-area').innerHTML = `
         <div class="flex justify-between items-start border-b-2 border-red-600 pb-6 mb-6">
@@ -1037,6 +1084,152 @@
           </div>
         </div>
       `;
+    }
+
+    function downloadInvoicePDF() {
+      const { items, clientInfo, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      // Encabezado
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(185, 28, 28);
+      doc.text(companySettings.name || 'DE CHINA AL MUNDO', 14, 18);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(90, 90, 90);
+      doc.text(companySettings.subtitle || 'International Logistics & Cargo Consolidation', 14, 23);
+      doc.text(`China: ${companySettings.china_warehouse || ''}`, 14, 28, { maxWidth: 115 });
+      doc.text(`Argentina: ${companySettings.arg_warehouse || ''}`, 14, 33, { maxWidth: 115 });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(30, 41, 59);
+      doc.text('COMMERCIAL INVOICE', 196, 18, { align: 'right' });
+
+      doc.setFontSize(10);
+      doc.setTextColor(185, 28, 28);
+      doc.text(invNumber, 196, 24, { align: 'right' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Date: ${today} | Incoterm: ${incoterm}`, 196, 29, { align: 'right' });
+      doc.text(`Container: ${currentContainer.container_number} (${currentContainer.container_type})`, 196, 34, { align: 'right' });
+
+      doc.setDrawColor(220, 38, 38);
+      doc.setLineWidth(0.6);
+      doc.line(14, 39, 196, 39);
+
+      // Consignee y Embarque
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+      doc.text('Consignee / Client:', 14, 46);
+      doc.setFont('helvetica', 'normal');
+      doc.text(activeInvoiceClient, 14, 51);
+      if (clientInfo.client_tax_id) doc.text(`Tax ID / CUIT: ${clientInfo.client_tax_id}`, 14, 56);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Shipment Info:', 115, 46);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`BL: ${currentContainer.bl_number || 'N/A'}`, 115, 51);
+      doc.text(`Route: ${currentContainer.pol} -> ${currentContainer.pod}`, 115, 56);
+      doc.text(`Mark: ${clientInfo.shipping_mark || 'DE CHINA AL MUNDO'}`, 115, 61);
+
+      // Tabla de mercadería
+      const tableBody = items.map(i => [
+        i.description,
+        i.hs_code || '-',
+        String(i.packages),
+        Number(i.gross_weight).toFixed(2),
+        Number(i.cbm).toFixed(3),
+        `$${Number(i.unit_price).toFixed(2)}`,
+        `$${Number(i.total_value).toFixed(2)}`
+      ]);
+
+      doc.autoTable({
+        startY: 67,
+        head: [['Description', 'HS Code', 'Pkgs', 'G.W. (KG)', 'CBM', 'Unit USD', 'Total USD']],
+        body: tableBody,
+        theme: 'grid',
+        headStyles: { fillColor: [30, 41, 59], fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right' },
+          5: { halign: 'right' },
+          6: { halign: 'right' }
+        }
+      });
+
+      const finalY = (doc.lastAutoTable?.finalY || 120) + 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text('Bank / Payment Details:', 14, finalY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(companySettings.bank_details || 'Consultar datos bancarios con De China al Mundo.', 14, finalY + 5, { maxWidth: 105 });
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Subtotal (${incoterm}): USD ${subtotal.toFixed(2)}`, 196, finalY, { align: 'right' });
+      if (freight > 0) {
+        doc.text(`Freight / Charges: USD ${freight.toFixed(2)}`, 196, finalY + 5, { align: 'right' });
+      }
+      doc.setFontSize(11);
+      doc.setTextColor(185, 28, 28);
+      doc.text(`TOTAL USD: $${grandTotal.toFixed(2)}`, 196, finalY + (freight > 0 ? 12 : 7), { align: 'right' });
+
+      const safeClient = activeInvoiceClient.replace(/[^a-zA-Z0-9_-]/g, '_');
+      doc.save(`${invNumber}_${safeClient}.pdf`);
+    }
+
+    function exportInvoiceExcel() {
+      const { items, clientInfo, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
+
+      const headerRows = [
+        { Campo: 'Empresa', Valor: companySettings.name || 'DE CHINA AL MUNDO' },
+        { Campo: 'Invoice N°', Valor: invNumber },
+        { Campo: 'Fecha', Valor: today },
+        { Campo: 'Cliente', Valor: activeInvoiceClient },
+        { Campo: 'Contenedor', Valor: `${currentContainer.container_number} (${currentContainer.container_type})` },
+        { Campo: 'BL', Valor: currentContainer.bl_number || 'N/A' },
+        { Campo: 'Incoterm', Valor: incoterm },
+        { Campo: 'Shipping Mark', Valor: clientInfo.shipping_mark || 'DE CHINA AL MUNDO' },
+        {}
+      ];
+
+      const detailRows = items.map((i, idx) => ({
+        'Ítem': idx + 1,
+        'Lote': i.lot_number || '',
+        'Seguimiento': i.tracking_ref || '',
+        'Descripción': i.description,
+        'Código HS': i.hs_code || '',
+        'Cantidad': Number(i.packages),
+        'Peso Bruto (KG)': Number(i.gross_weight),
+        'CBM': Number(i.cbm),
+        'Precio Unit. USD': Number(i.unit_price),
+        'Total USD': Number(i.total_value)
+      }));
+
+      detailRows.push({});
+      detailRows.push({ 'Descripción': `Subtotal (${incoterm})`, 'Total USD': Number(subtotal.toFixed(2)) });
+      if (freight > 0) {
+        detailRows.push({ 'Descripción': 'Flete / Gastos', 'Total USD': Number(freight.toFixed(2)) });
+      }
+      detailRows.push({ 'Descripción': 'TOTAL GENERAL USD', 'Total USD': Number(grandTotal.toFixed(2)) });
+
+      const wsMeta = XLSX.utils.json_to_sheet(headerRows);
+      const wsItems = XLSX.utils.json_to_sheet(detailRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsMeta, 'Datos Invoice');
+      XLSX.utils.book_append_sheet(wb, wsItems, 'Detalle Invoice');
+
+      const safeClient = activeInvoiceClient.replace(/[^a-zA-Z0-9_-]/g, '_');
+      XLSX.writeFile(wb, `${invNumber}_${safeClient}.xlsx`);
     }
 
     function closeModals() {
