@@ -118,6 +118,9 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openContainerInvoiceModal()" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm">
+              📄 Invoice General Contenedor
+            </button>
             <button onclick="openImportModal(currentContainer?.id)" class="px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-xs font-bold text-amber-900">
               📥 Importar Excel aquí
             </button>
@@ -452,7 +455,7 @@
           <button onclick="exportInvoiceExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold">
             📊 Exportar Excel
           </button>
-          <button onclick="printInvoice()" class="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+          <button onclick="printInvoice()" class="bg-slate-600 hover:bg-slate-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold">
             🖨️ Imprimir
           </button>
           <button onclick="closeModals()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
@@ -474,6 +477,7 @@
     let checkedPackingIds = new Set();
     let companySettings = {};
     let activeInvoiceClient = null;
+    let activeInvoiceScope = 'client'; // 'client' | 'container'
     let activeInvoiceMeta = null;
     let parsedImportRows = [];
 
@@ -651,7 +655,6 @@
       const cont = containers.find(c => c.id === filterId);
       const totalQty = filtered.reduce((acc, i) => acc + Number(i.packages || 0), 0);
 
-      // Encabezado estilo Invoice de De China al Mundo
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
       doc.setTextColor(185, 28, 28);
@@ -1167,35 +1170,62 @@
       }
     }
 
-    // --- GENERADOR DE INVOICE + EXPORTACIÓN PDF / EXCEL ---
+    // --- GENERADOR DE INVOICE (CLIENTE O CONSOLIDADO GENERAL DEL CONTENEDOR) ---
     function openInvoiceModal(clientName) {
+      activeInvoiceScope = 'client';
       activeInvoiceClient = clientName;
       activeInvoiceMeta = null;
       document.getElementById('modal-invoice').classList.remove('hidden');
       renderInvoicePreview();
     }
 
+    function openContainerInvoiceModal() {
+      if (!currentContainer) return;
+      if (!currentCargoItems || currentCargoItems.length === 0) {
+        return alert('Este contenedor no tiene mercadería cargada para generar una Invoice General.');
+      }
+      activeInvoiceScope = 'container';
+      activeInvoiceClient = `CONSOLIDADO CONTENEDOR ${currentContainer.container_number}`;
+      activeInvoiceMeta = null;
+      document.getElementById('modal-invoice').classList.remove('hidden');
+      renderInvoicePreview();
+    }
+
     function getActiveInvoiceData() {
-      const items = currentCargoItems.filter(i => i.client_name.trim() === activeInvoiceClient);
-      const clientInfo = items[0] || {};
+      const isContainerScope = activeInvoiceScope === 'container';
+      const items = isContainerScope
+        ? [...currentCargoItems]
+        : currentCargoItems.filter(i => i.client_name.trim() === activeInvoiceClient);
+
+      const clientInfo = isContainerScope
+        ? {
+            client_tax_id: `${new Set(items.map(i => i.client_name.trim())).size} clientes consolidados`,
+            client_address: `${items.reduce((s, i) => s + Number(i.packages || 0), 0)} bultos | ${items.reduce((s, i) => s + Number(i.gross_weight || 0), 0).toFixed(2)} KG | ${items.reduce((s, i) => s + Number(i.cbm || 0), 0).toFixed(3)} CBM`,
+            shipping_mark: 'DE CHINA AL MUNDO'
+          }
+        : (items[0] || {});
+
       const incoterm = document.getElementById('inv-incoterm').value;
       const freight = parseFloat(document.getElementById('inv-freight').value) || 0;
       const subtotal = items.reduce((s, i) => s + Number(i.total_value), 0);
       const grandTotal = subtotal + freight;
 
-      if (!activeInvoiceMeta || activeInvoiceMeta.client !== activeInvoiceClient) {
+      const scopeKey = isContainerScope ? `container_${currentContainer.id}` : `client_${activeInvoiceClient}`;
+      if (!activeInvoiceMeta || activeInvoiceMeta.key !== scopeKey) {
         activeInvoiceMeta = {
-          client: activeInvoiceClient,
-          invNumber: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          key: scopeKey,
+          invNumber: isContainerScope
+            ? `INV-CONT-${currentContainer.container_number}-${new Date().getFullYear()}`
+            : `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
           today: new Date().toLocaleDateString('es-AR')
         };
       }
 
-      return { items, clientInfo, incoterm, freight, subtotal, grandTotal, ...activeInvoiceMeta };
+      return { items, clientInfo, isContainerScope, incoterm, freight, subtotal, grandTotal, ...activeInvoiceMeta };
     }
 
     function renderInvoicePreview() {
-      const { items, clientInfo, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
+      const { items, clientInfo, isContainerScope, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
 
       document.getElementById('invoice-print-area').innerHTML = `
         <div class="flex justify-between items-start border-b-2 border-red-600 pb-6 mb-6">
@@ -1207,7 +1237,7 @@
             <p class="text-xs text-slate-600"><strong>Email:</strong> ${companySettings.contact_email || ''} ${companySettings.tax_id ? '| <strong>Tax ID:</strong> ' + companySettings.tax_id : ''}</p>
           </div>
           <div class="text-right">
-            <h2 class="text-3xl font-black text-slate-800 tracking-tight">COMMERCIAL INVOICE</h2>
+            <h2 class="text-3xl font-black text-slate-800 tracking-tight">${isContainerScope ? 'MASTER CONSOLIDATED INVOICE' : 'COMMERCIAL INVOICE'}</h2>
             <p class="text-sm font-bold text-red-600 mt-1">N° ${invNumber}</p>
             <p class="text-xs text-slate-500 mt-1">Date: <strong>${today}</strong></p>
             <p class="text-xs text-slate-500">Incoterm: <strong>${incoterm}</strong></p>
@@ -1216,9 +1246,9 @@
 
         <div class="grid grid-cols-2 gap-6 mb-6 text-xs">
           <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-            <p class="font-bold text-slate-400 uppercase mb-1">Consignee / Buyer (Cliente)</p>
+            <p class="font-bold text-slate-400 uppercase mb-1">${isContainerScope ? 'Consolidation Scope' : 'Consignee / Buyer (Cliente)'}</p>
             <p class="text-sm font-bold text-slate-900">${activeInvoiceClient}</p>
-            ${clientInfo.client_tax_id ? `<p class="text-slate-600 mt-0.5">CUIT / Tax ID: ${clientInfo.client_tax_id}</p>` : ''}
+            ${clientInfo.client_tax_id ? `<p class="text-slate-600 mt-0.5">${isContainerScope ? clientInfo.client_tax_id : 'CUIT / Tax ID: ' + clientInfo.client_tax_id}</p>` : ''}
             ${clientInfo.client_address ? `<p class="text-slate-600 mt-0.5">${clientInfo.client_address}</p>` : ''}
           </div>
           <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -1233,6 +1263,7 @@
         <table class="w-full text-xs border-collapse mb-6">
           <thead>
             <tr class="bg-slate-800 text-white uppercase">
+              ${isContainerScope ? '<th class="p-2.5 text-left">Client</th>' : ''}
               <th class="p-2.5 text-left">Description of Goods</th>
               <th class="p-2.5 text-left">HS Code</th>
               <th class="p-2.5 text-right">Pkgs</th>
@@ -1245,6 +1276,7 @@
           <tbody class="divide-y divide-slate-200 border-b border-slate-300">
             ${items.map(i => `
               <tr>
+                ${isContainerScope ? `<td class="p-2.5 font-semibold text-slate-800">${i.client_name}</td>` : ''}
                 <td class="p-2.5 font-medium">${i.description}</td>
                 <td class="p-2.5 text-slate-600">${i.hs_code || '-'}</td>
                 <td class="p-2.5 text-right">${i.packages}</td>
@@ -1274,7 +1306,7 @@
     }
 
     function downloadInvoicePDF() {
-      const { items, clientInfo, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
+      const { items, clientInfo, isContainerScope, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
@@ -1291,9 +1323,9 @@
       doc.text(`Argentina: ${companySettings.arg_warehouse || ''}`, 14, 33, { maxWidth: 115 });
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
+      doc.setFontSize(isContainerScope ? 12 : 14);
       doc.setTextColor(30, 41, 59);
-      doc.text('COMMERCIAL INVOICE', 196, 18, { align: 'right' });
+      doc.text(isContainerScope ? 'MASTER CONSOLIDATED INVOICE' : 'COMMERCIAL INVOICE', 196, 18, { align: 'right' });
 
       doc.setFontSize(10);
       doc.setTextColor(185, 28, 28);
@@ -1312,10 +1344,10 @@
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(30, 41, 59);
-      doc.text('Consignee / Client:', 14, 46);
+      doc.text(isContainerScope ? 'Consolidation Scope:' : 'Consignee / Client:', 14, 46);
       doc.setFont('helvetica', 'normal');
       doc.text(activeInvoiceClient, 14, 51);
-      if (clientInfo.client_tax_id) doc.text(`Tax ID / CUIT: ${clientInfo.client_tax_id}`, 14, 56);
+      if (clientInfo.client_tax_id) doc.text(isContainerScope ? clientInfo.client_tax_id : `Tax ID / CUIT: ${clientInfo.client_tax_id}`, 14, 56);
 
       doc.setFont('helvetica', 'bold');
       doc.text('Shipment Info:', 115, 46);
@@ -1324,30 +1356,41 @@
       doc.text(`Route: ${currentContainer.pol} -> ${currentContainer.pod}`, 115, 56);
       doc.text(`Mark: ${clientInfo.shipping_mark || 'DE CHINA AL MUNDO'}`, 115, 61);
 
-      const tableBody = items.map(i => [
-        i.description,
-        i.hs_code || '-',
-        String(i.packages),
-        Number(i.gross_weight).toFixed(2),
-        Number(i.cbm).toFixed(3),
-        `$${Number(i.unit_price).toFixed(2)}`,
-        `$${Number(i.total_value).toFixed(2)}`
-      ]);
+      const headRow = isContainerScope
+        ? ['Client', 'Description', 'HS Code', 'Pkgs', 'G.W.', 'CBM', 'Unit', 'Total USD']
+        : ['Description', 'HS Code', 'Pkgs', 'G.W. (KG)', 'CBM', 'Unit USD', 'Total USD'];
+
+      const tableBody = items.map(i => isContainerScope
+        ? [
+            i.client_name,
+            i.description,
+            i.hs_code || '-',
+            String(i.packages),
+            Number(i.gross_weight).toFixed(2),
+            Number(i.cbm).toFixed(3),
+            `$${Number(i.unit_price).toFixed(2)}`,
+            `$${Number(i.total_value).toFixed(2)}`
+          ]
+        : [
+            i.description,
+            i.hs_code || '-',
+            String(i.packages),
+            Number(i.gross_weight).toFixed(2),
+            Number(i.cbm).toFixed(3),
+            `$${Number(i.unit_price).toFixed(2)}`,
+            `$${Number(i.total_value).toFixed(2)}`
+          ]);
 
       doc.autoTable({
         startY: 67,
-        head: [['Description', 'HS Code', 'Pkgs', 'G.W. (KG)', 'CBM', 'Unit USD', 'Total USD']],
+        head: [headRow],
         body: tableBody,
         theme: 'grid',
-        headStyles: { fillColor: [30, 41, 59], fontSize: 8 },
-        styles: { fontSize: 8, cellPadding: 2 },
-        columnStyles: {
-          2: { halign: 'right' },
-          3: { halign: 'right' },
-          4: { halign: 'right' },
-          5: { halign: 'right' },
-          6: { halign: 'right' }
-        }
+        headStyles: { fillColor: [30, 41, 59], fontSize: 7.5 },
+        styles: { fontSize: 7.5, cellPadding: 1.8 },
+        columnStyles: isContainerScope
+          ? { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } }
+          : { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } }
       });
 
       const finalY = (doc.lastAutoTable?.finalY || 120) + 8;
@@ -1367,18 +1410,18 @@
       doc.setTextColor(185, 28, 28);
       doc.text(`TOTAL USD: $${grandTotal.toFixed(2)}`, 196, finalY + (freight > 0 ? 12 : 7), { align: 'right' });
 
-      const safeClient = activeInvoiceClient.replace(/[^a-zA-Z0-9_-]/g, '_');
-      doc.save(`${invNumber}_${safeClient}.pdf`);
+      const safeLabel = activeInvoiceClient.replace(/[^a-zA-Z0-9_-]/g, '_');
+      doc.save(`${invNumber}_${safeLabel}.pdf`);
     }
 
     function exportInvoiceExcel() {
-      const { items, clientInfo, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
+      const { items, clientInfo, isContainerScope, incoterm, freight, subtotal, grandTotal, invNumber, today } = getActiveInvoiceData();
 
       const headerRows = [
         { Campo: 'Empresa', Valor: companySettings.name || 'DE CHINA AL MUNDO' },
         { Campo: 'Invoice N°', Valor: invNumber },
         { Campo: 'Fecha', Valor: today },
-        { Campo: 'Cliente', Valor: activeInvoiceClient },
+        { Campo: isContainerScope ? 'Alcance' : 'Cliente', Valor: activeInvoiceClient },
         { Campo: 'Contenedor', Valor: `${currentContainer.container_number} (${currentContainer.container_type})` },
         { Campo: 'BL', Valor: currentContainer.bl_number || 'N/A' },
         { Campo: 'Incoterm', Valor: incoterm },
@@ -1388,6 +1431,7 @@
 
       const detailRows = items.map((i, idx) => ({
         'Ítem': idx + 1,
+        'Cliente': i.client_name || '',
         'Lote': i.lot_number || '',
         'Seguimiento': i.tracking_ref || '',
         'Descripción': i.description,
@@ -1412,8 +1456,8 @@
       XLSX.utils.book_append_sheet(wb, wsMeta, 'Datos Invoice');
       XLSX.utils.book_append_sheet(wb, wsItems, 'Detalle Invoice');
 
-      const safeClient = activeInvoiceClient.replace(/[^a-zA-Z0-9_-]/g, '_');
-      XLSX.writeFile(wb, `${invNumber}_${safeClient}.xlsx`);
+      const safeLabel = activeInvoiceClient.replace(/[^a-zA-Z0-9_-]/g, '_');
+      XLSX.writeFile(wb, `${invNumber}_${safeLabel}.xlsx`);
     }
 
     function closeModals() {
