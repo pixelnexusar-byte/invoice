@@ -1,1375 +1,720 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>De China al Mundo - Consolidación de Contenedores e Invoices</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-        }
-        /* Estilos específicos para impresión de la Invoice */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #invoice-printable-area, #invoice-printable-area * {
-                visibility: visible;
-            }
-            #invoice-printable-area {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 20px;
-                box-shadow: none !important;
-                border: none !important;
-            }
-            .no-print {
-                display: none !important;
-            }
-        }
-        /* Scrollbar personalizado */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>De China al Mundo — Consolidación & Invoices</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #invoice-print-area, #invoice-print-area * { visibility: visible; }
+      #invoice-print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; box-shadow: none !important; }
+      .no-print { display: none !important; }
+    }
+  </style>
 </head>
-<body class="text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-900">
+<body class="bg-slate-100 text-slate-800 font-sans">
 
-    <!-- Contenedor Principal -->
-    <div class="min-h-screen flex flex-col">
-        
-        <!-- Barra de Navegación Superior -->
-        <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between items-center h-16">
-                    <!-- Logo y Nombre -->
-                    <div class="flex items-center space-x-3">
-                        <div class="bg-white p-1.5 rounded-lg shadow-inner flex items-center justify-center w-12 h-11 overflow-hidden">
-                            <!-- Logo Vectorial De China al Mundo -->
-                            <svg viewBox="0 0 220 140" class="w-full h-full">
-                                <path d="M 35 75 C 15 115, 75 135, 135 125 C 195 115, 215 70, 160 45 C 195 70, 175 105, 125 112 C 75 120, 30 102, 35 75 Z" fill="#EAB308"/>
-                                <path d="M 55 45 L 95 38 L 105 22 L 110 37 L 155 30 L 112 44 L 115 52 L 100 52 L 95 45 Z" fill="#DC2626"/>
-                                <circle cx="82" cy="49" r="5" fill="#DC2626"/><circle cx="82" cy="49" r="2.5" fill="#EAB308"/>
-                                <circle cx="128" cy="43" r="5" fill="#DC2626"/><circle cx="128" cy="43" r="2.5" fill="#EAB308"/>
-                                <text x="112" y="76" font-family="Inter, sans-serif" font-weight="900" font-size="22" fill="#DC2626" text-anchor="middle">DE CHINA</text>
-                                <text x="112" y="96" font-family="Inter, sans-serif" font-weight="800" font-size="16" fill="#EAB308" text-anchor="middle">AL MUNDO</text>
-                            </svg>
-                        </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-lg tracking-tight leading-none text-white">DE CHINA <span class="text-amber-400">AL MUNDO</span></span>
-                                <span id="cloud-status-badge" class="text-[10px] bg-slate-800 text-amber-400 border border-slate-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <i class="fa-solid fa-cloud-arrow-up animate-pulse"></i> Conectando...
-                                </span>
-                            </div>
-                            <span class="text-[11px] text-slate-400 font-medium tracking-wider uppercase block mt-0.5">Consolidación & Invoices</span>
-                        </div>
-                    </div>
+  <!-- CONFIGURACIÓN SUPABASE -->
+  <script>
+    const SUPABASE_URL = 'https://nsyerdbeqedtnrgpnpgi.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zeWVyZGJlcWVkdG5yZ3BucGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2NzQxMTIsImV4cCI6MjExMTI1MDExMn0.rTqEvHL3_MwxjN98h35UApUQ6N8ebrsePvh-Wz7TCrI';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
 
-                    <!-- Navegación Desktop -->
-                    <nav class="hidden md:flex space-x-2">
-                        <button onclick="switchTab('containers')" id="nav-containers" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white transition flex items-center gap-2">
-                            <i class="fa-solid fa-boxes-stacked"></i> Consolidación Contenedores
-                        </button>
-                        <button onclick="switchTab('invoices')" id="nav-invoices" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-2">
-                            <i class="fa-solid fa-file-invoice-dollar"></i> Generador de Invoices
-                        </button>
-                        <button onclick="switchTab('settings')" id="nav-settings" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-2">
-                            <i class="fa-solid fa-building"></i> Datos Compañía
-                        </button>
-                    </nav>
-
-                    <!-- Botón Acción Rápida -->
-                    <div class="flex items-center space-x-3">
-                        <button onclick="openNewContainerModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-bold px-3.5 py-2 rounded-lg shadow transition flex items-center gap-2">
-                            <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Nuevo Contenedor</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Navegación Móvil -->
-            <div class="md:hidden border-t border-slate-800 flex justify-around p-2 bg-slate-900">
-                <button onclick="switchTab('containers')" id="mob-nav-containers" class="flex-1 py-1.5 text-xs font-medium text-center text-amber-400 border-b-2 border-amber-400">
-                    <i class="fa-solid fa-boxes-stacked block mb-1 text-sm"></i> Contenedores
-                </button>
-                <button onclick="switchTab('invoices')" id="mob-nav-invoices" class="flex-1 py-1.5 text-xs font-medium text-center text-slate-400">
-                    <i class="fa-solid fa-file-invoice-dollar block mb-1 text-sm"></i> Invoices
-                </button>
-                <button onclick="switchTab('settings')" id="mob-nav-settings" class="flex-1 py-1.5 text-xs font-medium text-center text-slate-400">
-                    <i class="fa-solid fa-building block mb-1 text-sm"></i> Compañía
-                </button>
-            </div>
-        </header>
-
-        <!-- Notificación Toast Flotante -->
-        <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 no-print"></div>
-
-        <!-- Área de Contenido Principal -->
-        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-
-            <!-- ========================================== -->
-            <!-- PESTAÑA 1: CONSOLIDACIÓN DE CONTENEDORES   -->
-            <!-- ========================================== -->
-            <div id="view-containers" class="space-y-6">
-                
-                <!-- Resumen KPIs -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-medium text-slate-500 uppercase">Contenedores Activos</p>
-                            <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-containers">0</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
-                            <i class="fa-solid fa-ferry"></i>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-medium text-slate-500 uppercase">Clientes Consolidados</p>
-                            <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-clients">0</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
-                            <i class="fa-solid fa-users"></i>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-medium text-slate-500 uppercase">Volumen Total (CBM)</p>
-                            <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-cbm">0.00 <span class="text-xs font-normal text-slate-400">m³</span></p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
-                            <i class="fa-solid fa-cube"></i>
-                        </div>
-                    </div>
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-medium text-slate-500 uppercase">Valor Carga Total</p>
-                            <p class="text-2xl font-bold text-slate-800 mt-1" id="kpi-value">$0.00</p>
-                        </div>
-                        <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-lg">
-                            <i class="fa-solid fa-sack-dollar"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Filtros y Buscador -->
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row gap-4 justify-between items-center">
-                    <div class="relative w-full sm:w-80">
-                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        <input type="text" id="search-input" onkeyup="renderContainers()" placeholder="Buscar contenedor, BL o cliente..." class="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                    </div>
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <span class="text-xs font-medium text-slate-500">Estado:</span>
-                        <select id="filter-status" onchange="renderContainers()" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none flex-grow sm:flex-grow-0">
-                            <option value="ALL">Todos los estados</option>
-                            <option value="Consolidando">Consolidando (Abierto)</option>
-                            <option value="En Tránsito">En Tránsito</option>
-                            <option value="En Puerto / Aduana">En Puerto / Aduana</option>
-                            <option value="Entregado">Entregado</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Lista de Contenedores -->
-                <div id="containers-list" class="space-y-6">
-                    <!-- Se renderiza dinámicamente con JS -->
-                </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- PESTAÑA 2: GENERADOR DE INVOICES           -->
-            <!-- ========================================== -->
-            <div id="view-invoices" class="hidden space-y-6">
-                
-                <!-- Panel de Selección de Invoice -->
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print">
-                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-grow">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">1. Seleccionar Contenedor</label>
-                                <select id="inv-select-container" onchange="onInvoiceContainerChange()" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <!-- Opciones dinámicas -->
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">2. Cliente a Facturar</label>
-                                <select id="inv-select-client" onchange="generateInvoicePreview()" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <!-- Opciones dinámicas -->
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">3. Tipo de Documento</label>
-                                <select id="inv-doc-type" onchange="generateInvoicePreview()" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <option value="COMMERCIAL INVOICE">Commercial Invoice (Factura)</option>
-                                    <option value="PROFORMA INVOICE">Proforma Invoice</option>
-                                    <option value="PACKING LIST & INVOICE">Invoice + Packing List Detallado</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2 pt-2 md:pt-0">
-                            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm transition flex items-center gap-2">
-                                <i class="fa-solid fa-print"></i> Imprimir / Guardar PDF
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Opciones adicionales de facturación -->
-                    <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-xs text-slate-500 mb-1">Incoterm</label>
-                            <select id="inv-incoterm" onchange="generateInvoicePreview()" class="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5">
-                                <option value="FOB">FOB (Free On Board)</option>
-                                <option value="CIF">CIF (Cost, Insurance & Freight)</option>
-                                <option value="EXW">EXW (Ex Works)</option>
-                                <option value="CFR">CFR (Cost and Freight)</option>
-                                <option value="DDP">DDP (Delivered Duty Paid)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-500 mb-1">Flete / Seguro Adicional (USD)</label>
-                            <input type="number" id="inv-freight" value="0" min="0" step="10" oninput="generateInvoicePreview()" class="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-500 mb-1">Condición de Pago</label>
-                            <input type="text" id="inv-payment" value="T/T 30% Advance, 70% against BL copy" oninput="generateInvoicePreview()" class="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5">
-                        </div>
-                        <div>
-                            <label class="block text-xs text-slate-500 mb-1">N° de Invoice</label>
-                            <input type="text" id="inv-number" value="INV-2026-0084" oninput="generateInvoicePreview()" class="w-full text-xs border border-slate-300 rounded-md px-2.5 py-1.5 font-mono">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Vista Previa del Documento (Área Imprimible) -->
-                <div id="invoice-printable-area" class="bg-white p-8 sm:p-12 rounded-xl shadow-md border border-slate-200 max-w-4xl mx-auto">
-                    <!-- Contenido de la Invoice generado dinámicamente -->
-                </div>
-
-            </div>
-
-            <!-- ========================================== -->
-            <!-- PESTAÑA 3: CONFIGURACIÓN DE LA COMPAÑÍA    -->
-            <!-- ========================================== -->
-            <div id="view-settings" class="hidden max-w-3xl mx-auto">
-                <div class="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200">
-                    <div class="border-b border-slate-200 pb-4 mb-6">
-                        <h2 class="text-lg font-bold text-slate-800">Datos del Exportador / Compañía</h2>
-                        <p class="text-sm text-slate-500">Esta información aparecerá automáticamente en el encabezado de todas las Invoices generadas.</p>
-                    </div>
-
-                    <form onsubmit="saveCompanySettings(event)" class="space-y-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nombre de la Compañía</label>
-                                <input type="text" id="comp-name" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tax ID / RUT / CUIT / EIN</label>
-                                <input type="text" id="comp-tax" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Dirección Completa</label>
-                            <input type="text" id="comp-address" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Teléfono / Contacto</label>
-                                <input type="text" id="comp-phone" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Email Corporativo</label>
-                                <input type="email" id="comp-email" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                            </div>
-                        </div>
-
-                        <div class="pt-4 border-t border-slate-100">
-                            <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Datos Bancarios (Para transferencias en Invoice)</label>
-                            <textarea id="comp-bank" rows="3" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
-                        </div>
-
-                        <div class="flex justify-end pt-2">
-                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg shadow transition">
-                                Guardar Configuración
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-        </main>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- MODAL: NUEVO / EDITAR CONTENEDOR           -->
-    <!-- ========================================== -->
-    <div id="modal-container" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden animate-fade-in">
-            <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
-                <h3 class="font-bold text-base" id="modal-container-title">Registrar Nuevo Contenedor</h3>
-                <button onclick="closeModal('modal-container')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form onsubmit="saveContainer(event)" class="p-6 space-y-4">
-                <input type="hidden" id="cont-id">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">N° Contenedor *</label>
-                        <input type="text" id="cont-number" placeholder="Ej: MSCU1234567" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 uppercase font-mono">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tipo de Equipo *</label>
-                        <select id="cont-type" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
-                            <option value="20GP" data-cbm="33">20' Standard (Cap: ~28-33 m³)</option>
-                            <option value="40GP" data-cbm="67">40' Standard (Cap: ~58-67 m³)</option>
-                            <option value="40HQ" selected data-cbm="76">40' High Cube (Cap: ~68-76 m³)</option>
-                            <option value="45HQ" data-cbm="86">45' High Cube (Cap: ~86 m³)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Bill of Lading (BL) / Ref</label>
-                        <input type="text" id="cont-bl" placeholder="Ej: HLCU98765432" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 uppercase font-mono">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Estado</label>
-                        <select id="cont-status" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
-                            <option value="Consolidando">Consolidando (Abierto)</option>
-                            <option value="En Tránsito">En Tránsito</option>
-                            <option value="En Puerto / Aduana">En Puerto / Aduana</option>
-                            <option value="Entregado">Entregado</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Puerto Origen</label>
-                        <input type="text" id="cont-pol" placeholder="Ej: Ningbo, CN" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Puerto Destino</label>
-                        <input type="text" id="cont-pod" placeholder="Ej: Buenos Aires, AR" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">ETA (Llegada)</label>
-                        <input type="date" id="cont-eta" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                    <button type="button" onclick="closeModal('modal-container')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                    <button type="submit" class="px-5 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow">Guardar Contenedor</button>
-                </div>
-            </form>
+  <!-- NAVBAR -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Logo SVG De China al Mundo -->
+        <svg class="w-11 h-11" viewBox="0 0 200 160" fill="none">
+          <path d="M25 85 C 15 135, 185 135, 165 65 C 175 120, 30 120, 25 85 Z" fill="#EAB308"/>
+          <path d="M60 45 L100 35 L140 45 L100 52 Z" fill="#DC2626"/>
+          <ellipse cx="100" cy="42" rx="14" ry="18" fill="#DC2626"/>
+          <path d="M97 24 L100 10 L103 24 Z" fill="#DC2626"/>
+          <circle cx="78" cy="54" r="7" fill="#DC2626"/><circle cx="78" cy="54" r="3.5" fill="#EAB308"/>
+          <circle cx="122" cy="54" r="7" fill="#DC2626"/><circle cx="122" cy="54" r="3.5" fill="#EAB308"/>
+        </svg>
+        <div>
+          <h1 class="font-extrabold text-lg tracking-tight text-red-700 leading-none">DE CHINA <span class="text-amber-500">AL MUNDO</span></h1>
+          <div class="flex items-center gap-2 mt-1">
+            <span id="db-status" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Conectado a Supabase
+            </span>
+          </div>
         </div>
+      </div>
+
+      <nav class="flex items-center gap-2">
+        <button onclick="switchTab('containers')" id="tab-containers" class="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white shadow-sm">
+          Contenedores y Carga
+        </button>
+        <button onclick="switchTab('company')" id="tab-company" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100">
+          Datos Empresa
+        </button>
+      </nav>
     </div>
+  </header>
 
-    <!-- ========================================== -->
-    <!-- MODAL: AGREGAR CARGA DE CLIENTE            -->
-    <!-- ========================================== -->
-    <div id="modal-cargo" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col">
-            <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shrink-0">
-                <div>
-                    <h3 class="font-bold text-base">Consolidar Mercadería de Cliente</h3>
-                    <p class="text-xs text-slate-400" id="modal-cargo-subtitle">Contenedor: MSCU1234567</p>
-                </div>
-                <button onclick="closeModal('modal-cargo')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            
-            <form onsubmit="saveCargoItem(event)" class="p-6 space-y-4 overflow-y-auto">
-                <input type="hidden" id="cargo-container-id">
-                
-                <!-- Datos del Cliente -->
-                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <i class="fa-solid fa-user-tie text-blue-600"></i> 1. Identificación del Cliente / Consignatario
-                    </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Nombre / Razón Social Cliente *</label>
-                            <input type="text" id="cargo-client-name" list="existing-clients-list" placeholder="Ej: Importadora del Sur S.A." required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
-                            <datalist id="existing-clients-list"></datalist>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Tax ID / CUIT / RUT Cliente *</label>
-                            <input type="text" id="cargo-client-tax" placeholder="Ej: 30-71234567-9" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Dirección Fiscal</label>
-                            <input type="text" id="cargo-client-address" placeholder="Av. Corrientes 1234, CABA" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Marca de Bultos (Shipping Mark)</label>
-                            <input type="text" id="cargo-mark" placeholder="Ej: SUR-01/50" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white uppercase font-mono">
-                        </div>
-                    </div>
-                </div>
+  <!-- MAIN CONTENT -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
 
-                <!-- Datos de la Mercadería -->
-                <div class="space-y-3">
-                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <i class="fa-solid fa-box-open text-emerald-600"></i> 2. Detalle de la Mercadería (Para Packing & Invoice)
-                    </h4>
-                    
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div class="sm:col-span-2">
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Descripción de Mercadería *</label>
-                            <input type="text" id="cargo-desc" placeholder="Ej: Repuestos automotrices de acero" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">HS Code (Posición Arancelaria)</label>
-                            <input type="text" id="cargo-hs" placeholder="Ej: 8708.99.90" class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 font-mono">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Cant. Bultos (CTNS) *</label>
-                            <input type="number" id="cargo-pkgs" min="1" value="10" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Volumen (CBM m³) *</label>
-                            <input type="number" id="cargo-cbm" min="0.01" step="0.01" value="2.50" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Peso Bruto (KG) *</label>
-                            <input type="number" id="cargo-weight" min="0.1" step="0.1" value="450" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">Unidades (PCS) *</label>
-                            <input type="number" id="cargo-qty" min="1" value="500" oninput="calcCargoTotal()" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-blue-50/70 p-3 rounded-lg border border-blue-100">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Precio Unitario (USD) *</label>
-                            <input type="number" id="cargo-price" min="0.01" step="0.01" value="12.50" oninput="calcCargoTotal()" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Total Línea (USD)</label>
-                            <input type="text" id="cargo-total-preview" readonly value="$6,250.00" class="w-full text-sm font-bold text-blue-700 border border-blue-200 rounded-lg px-3 py-2 bg-blue-50">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                    <button type="button" onclick="closeModal('modal-cargo')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                    <button type="submit" class="px-5 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow flex items-center gap-2">
-                        <i class="fa-solid fa-plus"></i> Agregar al Contenedor
-                    </button>
-                </div>
-            </form>
+    <!-- VISTA 1: CONTENEDORES Y CONSOLIDACIÓN -->
+    <section id="view-containers">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Consolidación de Contenedores</h2>
+          <p class="text-sm text-slate-500">Gestioná contenedores, editá cargas por cliente y generá Invoices automáticas.</p>
         </div>
+        <button onclick="openContainerModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-2 self-start">
+          + Nuevo Contenedor
+        </button>
+      </div>
+
+      <!-- Selector de Contenedores -->
+      <div id="containers-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"></div>
+
+      <!-- Detalle del Contenedor Seleccionado -->
+      <div id="container-detail" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-6 border-b border-slate-200 bg-slate-50 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-3">
+              <span id="det-number" class="text-2xl font-extrabold text-slate-900"></span>
+              <span id="det-type" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800"></span>
+              <span id="det-status" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"></span>
+            </div>
+            <p id="det-route" class="text-sm text-slate-600 mt-1"></p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openContainerModal(currentContainer)" class="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700">
+              ✏️ Editar Contenedor
+            </button>
+            <button onclick="deleteContainer(currentContainer.id)" class="px-3 py-2 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-700">
+              🗑️ Eliminar
+            </button>
+            <button onclick="openCargoModal()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold shadow-sm">
+              + Agregar Mercadería / Cliente
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Ocupación CBM -->
+        <div class="px-6 py-4 bg-white border-b border-slate-100">
+          <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1.5">
+            <span>Ocupación Total del Contenedor</span>
+            <span id="det-capacity-text">0 / 68 CBM (0%)</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-2.5">
+            <div id="det-capacity-bar" class="bg-red-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Clientes Consolidados Agrupados -->
+        <div id="clients-grouped-list" class="p-6 space-y-6"></div>
+      </div>
+    </section>
+
+    <!-- VISTA 2: DATOS DE LA EMPRESA -->
+    <section id="view-company" class="hidden max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <h2 class="text-xl font-bold text-slate-900 mb-1">Configuración de De China al Mundo</h2>
+      <p class="text-sm text-slate-500 mb-6">Estos datos aparecen en el encabezado y pie de todas las Invoices generadas.</p>
+
+      <form onsubmit="saveCompanySettings(event)" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Comercial</label>
+            <input id="comp-name" type="text" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Subtítulo / Rubro</label>
+            <input id="comp-subtitle" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Bodega en China (Origen)</label>
+          <input id="comp-china" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Depósito / Oficina Argentina (Destino)</label>
+          <input id="comp-arg" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Email de Contacto</label>
+            <input id="comp-email" type="email" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CUIT / Tax ID</label>
+            <input id="comp-tax" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Datos Bancarios / Instrucciones de Pago (Pie de Invoice)</label>
+          <textarea id="comp-bank" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold shadow-sm">
+            Guardar Cambios en Supabase
+          </button>
+        </div>
+      </form>
+    </section>
+
+  </main>
+
+  <!-- MODAL CREAR / EDITAR CONTENEDOR -->
+  <div id="modal-container" class="hidden fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl">
+      <h3 id="modal-container-title" class="text-lg font-bold text-slate-900 mb-4">Nuevo Contenedor</h3>
+      <form onsubmit="saveContainer(event)" class="space-y-4">
+        <input type="hidden" id="cont-id" />
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">N° Contenedor *</label>
+            <input id="cont-number" type="text" required placeholder="MSKU1234567" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm uppercase" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo</label>
+            <select id="cont-type" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="20GP">20GP (33 CBM)</option>
+              <option value="40GP">40GP (67 CBM)</option>
+              <option value="40HQ" selected>40HQ (76 CBM)</option>
+              <option value="45HQ">45HQ (86 CBM)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Bill of Lading (BL)</label>
+            <input id="cont-bl" type="text" placeholder="BL-998877" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">ETA (Arribo Estimado)</label>
+            <input id="cont-eta" type="date" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Puerto Origen (POL)</label>
+            <input id="cont-pol" type="text" value="Guangzhou, China" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Puerto Destino (POD)</label>
+            <input id="cont-pod" type="text" value="Buenos Aires, Argentina" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Estado</label>
+          <select id="cont-status" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="En Consolidación">En Consolidación (Bodega China)</option>
+            <option value="En Tránsito">En Tránsito Marítimo</option>
+            <option value="Aduana / Arribado">Aduana / Arribado</option>
+            <option value="En Depósito Sarandí">En Depósito Sarandí</option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-2 pt-3">
+          <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700">Guardar Contenedor</button>
+        </div>
+      </form>
     </div>
-
-    <!-- ========================================== -->
-    <!-- LÓGICA DE LA APLICACIÓN (JAVASCRIPT)       -->
-    <!-- ========================================== -->
-    <!-- LÓGICA DE LA APLICACIÓN + NUBE (FIRESTORE) -->
-    <!-- ========================================== -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Configuración de Firebase proporcionada por el entorno
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'de-china-al-mundo-app';
-        
-        let db = null;
-        let auth = null;
-        let currentUser = null;
-
-        // Estado inicial de la compañía: DE CHINA AL MUNDO
-        let companySettings = {
-            name: "DE CHINA AL MUNDO",
-            taxId: "30-71849201-9 / HK-CR-2948102",
-            address: "Yiwu International Trade City, District 2, Zhejiang, China / Córdoba, Argentina",
-            phone: "+86 138 5790 8821 / +54 9 351 555-0192",
-            email: "operaciones@dechinaalmundo.com",
-            bankDetails: "Beneficiary: DE CHINA AL MUNDO LIMITED | Bank: HSBC Hong Kong | Account: 848-291045-838 | SWIFT: HSBCHKHHHKH"
-        };
-
-        // Lista de contenedores (se sincronizará automáticamente con la nube)
-        let containers = [];
-
-        // Datos iniciales por defecto si la nube está vacía la primera vez
-        const defaultSeedContainers = [
-            {
-                id: "cont-dcam-01",
-                number: "MSCU8492014",
-                type: "40HQ",
-                maxCbm: 68,
-                bl: "MEDU8849201",
-                status: "Consolidando",
-                pol: "Ningbo, China",
-                pod: "Buenos Aires, Argentina",
-                eta: "2026-12-18",
-                items: [
-                    {
-                        id: "item-101",
-                        clientName: "TecnoSur Importaciones S.A.",
-                        clientTax: "30-71458923-4",
-                        clientAddress: "Av. Belgrano 1540, CABA, Argentina",
-                        shippingMark: "DCAM-TECNOSUR",
-                        description: "Luminarias LED Industriales 150W",
-                        hsCode: "9405.42.00",
-                        pkgs: 120,
-                        cbm: 18.5,
-                        weight: 2400,
-                        qty: 600,
-                        unitPrice: 24.50
-                    },
-                    {
-                        id: "item-102",
-                        clientName: "Ferretería Industrial Córdoba SRL",
-                        clientTax: "30-68923411-2",
-                        clientAddress: "Av. Colón 3420, Córdoba, Argentina",
-                        shippingMark: "DCAM-FIC",
-                        description: "Herramientas Manuales de Acero Cromo-Vanadio",
-                        hsCode: "8204.11.00",
-                        pkgs: 85,
-                        cbm: 14.0,
-                        weight: 3850,
-                        qty: 1200,
-                        unitPrice: 11.00
-                    }
-                ]
-            }
-        ];
-
-        // Inicializar Nube y Autenticación
-        async function initCloudSync() {
-            const badge = document.getElementById('cloud-status-badge');
-            if (!firebaseConfig) {
-                badge.innerHTML = `<i class="fa-solid fa-hard-drive text-slate-400"></i> Modo Local`;
-                containers = [...defaultSeedContainers];
-                loadCompanyForm();
-                renderContainers();
-                populateInvoiceSelectors();
-                return;
-            }
-
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUser = user;
-                        badge.className = "text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-700/60 px-2.5 py-0.5 rounded-full flex items-center gap-1.5";
-                        badge.innerHTML = `<i class="fa-solid fa-cloud-check"></i> Sincronizado en Nube`;
-                        subscribeToCloudData();
-                    }
-                });
-            } catch (error) {
-                console.error("Error conectando con la nube:", error);
-                badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> Error Nube`;
-            }
-        }
-
-        // Escuchar cambios en tiempo real desde Firestore
-        function subscribeToCloudData() {
-            if (!currentUser || !db) return;
-
-            // 1. Escuchar datos de la compañía (ruta pública compartida para el equipo de la empresa)
-            const companyDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'company_profile');
-            onSnapshot(companyDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    companySettings = { ...companySettings, ...docSnap.data() };
-                } else {
-                    // Guardar perfil inicial de De China al Mundo en la nube
-                    setDoc(companyDocRef, companySettings);
-                }
-                loadCompanyForm();
-                generateInvoicePreview();
-            }, (err) => console.error("Error leyendo perfil empresa:", err));
-
-            // 2. Escuchar contenedores en tiempo real
-            const containersColRef = collection(db, 'artifacts', appId, 'public', 'data', 'containers');
-            onSnapshot(containersColRef, (snapshot) => {
-                if (snapshot.empty && !localStorage.getItem('dcam_seeded')) {
-                    // Cargar contenedor de ejemplo inicial una única vez
-                    defaultSeedContainers.forEach(c => {
-                        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'containers', c.id), c);
-                    });
-                    return;
-                }
-                
-                const loaded = [];
-                snapshot.forEach(docItem => {
-                    loaded.push(docItem.data());
-                });
-                
-                // Ordenar por fecha/ID más reciente en memoria
-                containers = loaded.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-                renderContainers();
-                populateInvoiceSelectors();
-            }, (err) => console.error("Error leyendo contenedores:", err));
-        }
-
-        // Guardar contenedor individual en Firestore
-        async function syncContainerToCloud(containerObj) {
-            if (!currentUser || !db) return;
-            try {
-                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'containers', containerObj.id);
-                await setDoc(ref, containerObj);
-            } catch (e) {
-                console.error("Error guardando contenedor:", e);
-                showToast("Error al sincronizar con la nube", "error");
-            }
-        }
-
-        // Eliminar contenedor en Firestore
-        async function removeContainerFromCloud(containerId) {
-            if (!currentUser || !db) return;
-            try {
-                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'containers', containerId);
-                await deleteDoc(ref);
-            } catch (e) {
-                console.error("Error eliminando contenedor:", e);
-            }
-        }
-
-        // Inicialización al cargar la página
-        window.onload = function() {
-            loadCompanyForm();
-            initCloudSync();
-        };
-
-        // Exponer funciones al scope global window para los eventos onclick/onsubmit del HTML
-        window.switchTab = function(tabName) {
-            document.getElementById('view-containers').classList.add('hidden');
-            document.getElementById('view-invoices').classList.add('hidden');
-            document.getElementById('view-settings').classList.add('hidden');
-
-            ['containers', 'invoices', 'settings'].forEach(t => {
-                const btn = document.getElementById(`nav-${t}`);
-                btn.classList.remove('bg-red-600', 'text-white');
-                btn.classList.add('text-slate-300', 'hover:bg-slate-800');
-                
-                const mobBtn = document.getElementById(`mob-nav-${t}`);
-                mobBtn.classList.remove('text-amber-400', 'border-b-2', 'border-amber-400');
-                mobBtn.classList.add('text-slate-400');
-            });
-
-            document.getElementById(`view-${tabName}`).classList.remove('hidden');
-            
-            const activeBtn = document.getElementById(`nav-${tabName}`);
-            activeBtn.classList.remove('text-slate-300', 'hover:bg-slate-800');
-            activeBtn.classList.add('bg-red-600', 'text-white');
-
-            const activeMobBtn = document.getElementById(`mob-nav-${tabName}`);
-            activeMobBtn.classList.remove('text-slate-400');
-            activeMobBtn.classList.add('text-amber-400', 'border-b-2', 'border-amber-400');
-
-            if (tabName === 'invoices') {
-                populateInvoiceSelectors();
-            }
-        };
-
-        window.showToast = function(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            const bgColor = type === 'success' ? 'bg-slate-900 border-amber-400' : 'bg-red-900 border-red-400';
-            const icon = type === 'success' ? '<i class="fa-solid fa-circle-check text-amber-400"></i>' : '<i class="fa-solid fa-circle-exclamation text-red-400"></i>';
-            
-            toast.className = `${bgColor} text-white px-4 py-3 rounded-xl shadow-lg border-l-4 flex items-center gap-3 text-sm transition-all duration-300 transform translate-y-2 opacity-0`;
-            toast.innerHTML = `${icon} <span>${message}</span>`;
-            
-            container.appendChild(toast);
-            requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
-
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 3500);
-        };
-
-        window.closeModal = function(modalId) {
-            document.getElementById(modalId).classList.add('hidden');
-        };
-
-        function formatCurrency(num) {
-            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
-        }
-
-        // ==========================================
-        // RENDERIZADO DE CONTENEDORES Y CONSOLIDACIÓN
-        // ==========================================
-        window.renderContainers = function() {
-            const listEl = document.getElementById('containers-list');
-            const searchTerm = document.getElementById('search-input').value.toLowerCase();
-            const statusFilter = document.getElementById('filter-status').value;
-
-            let totalClientsSet = new Set();
-            let globalCbm = 0;
-            let globalValue = 0;
-
-            containers.forEach(c => {
-                (c.items || []).forEach(item => {
-                    totalClientsSet.add(item.clientName.trim().toLowerCase());
-                    globalCbm += parseFloat(item.cbm);
-                    globalValue += (parseFloat(item.qty) * parseFloat(item.unitPrice));
-                });
-            });
-
-            document.getElementById('kpi-containers').innerText = containers.length;
-            document.getElementById('kpi-clients').innerText = totalClientsSet.size;
-            document.getElementById('kpi-cbm').innerHTML = `${globalCbm.toFixed(2)} <span class="text-xs font-normal text-slate-400">m³</span>`;
-            document.getElementById('kpi-value').innerText = formatCurrency(globalValue);
-
-            const filtered = containers.filter(c => {
-                const items = c.items || [];
-                const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
-                const matchesSearch = 
-                    c.number.toLowerCase().includes(searchTerm) ||
-                    (c.bl || '').toLowerCase().includes(searchTerm) ||
-                    c.pod.toLowerCase().includes(searchTerm) ||
-                    items.some(i => i.clientName.toLowerCase().includes(searchTerm) || i.description.toLowerCase().includes(searchTerm));
-                return matchesStatus && matchesSearch;
-            });
-
-            if (filtered.length === 0) {
-                listEl.innerHTML = `
-                    <div class="bg-white rounded-xl border border-slate-200 p-12 text-center">
-                        <div class="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
-                            <i class="fa-solid fa-box-open"></i>
-                        </div>
-                        <h3 class="text-base font-bold text-slate-700">No se encontraron contenedores</h3>
-                        <p class="text-sm text-slate-500 mt-1 mb-4">Intenta cambiar los filtros o registra un nuevo contenedor para consolidar carga.</p>
-                        <button onclick="openNewContainerModal()" class="bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-700">
-                            + Crear Primer Contenedor
-                        </button>
-                    </div>
-                `;
-                return;
-            }
-
-            listEl.innerHTML = filtered.map(cont => {
-                const items = cont.items || [];
-                const clientGroups = {};
-                let totalContCbm = 0;
-                let totalContWeight = 0;
-                let totalContPkgs = 0;
-                let totalContVal = 0;
-
-                items.forEach(item => {
-                    const cKey = item.clientName;
-                    if (!clientGroups[cKey]) {
-                        clientGroups[cKey] = {
-                            clientName: item.clientName,
-                            clientTax: item.clientTax,
-                            shippingMark: item.shippingMark,
-                            items: [],
-                            subCbm: 0,
-                            subWeight: 0,
-                            subPkgs: 0,
-                            subVal: 0
-                        };
-                    }
-                    const lineVal = item.qty * item.unitPrice;
-                    clientGroups[cKey].items.push(item);
-                    clientGroups[cKey].subCbm += item.cbm;
-                    clientGroups[cKey].subWeight += item.weight;
-                    clientGroups[cKey].subPkgs += item.pkgs;
-                    clientGroups[cKey].subVal += lineVal;
-
-                    totalContCbm += item.cbm;
-                    totalContWeight += item.weight;
-                    totalContPkgs += item.pkgs;
-                    totalContVal += lineVal;
-                });
-
-                const fillPercent = Math.min(100, Math.round((totalContCbm / cont.maxCbm) * 100));
-                let barColor = 'bg-emerald-500';
-                if (fillPercent > 90) barColor = 'bg-red-600';
-                else if (fillPercent > 75) barColor = 'bg-amber-500';
-
-                const statusColors = {
-                    'Consolidando': 'bg-blue-100 text-blue-800 border-blue-200',
-                    'En Tránsito': 'bg-amber-100 text-amber-800 border-amber-200',
-                    'En Puerto / Aduana': 'bg-purple-100 text-purple-800 border-purple-200',
-                    'Entregado': 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                };
-                const badgeClass = statusColors[cont.status] || 'bg-slate-100 text-slate-800';
-                const clientsArray = Object.values(clientGroups);
-
-                return `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition hover:shadow-md">
-                    <div class="bg-slate-50 border-b border-slate-200 p-4 sm:px-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div class="flex items-start sm:items-center gap-3">
-                            <div class="w-12 h-12 rounded-xl bg-slate-900 text-white flex flex-col items-center justify-center shrink-0 border-b-2 border-amber-400">
-                                <span class="text-[10px] text-slate-400 font-semibold">EQUIPO</span>
-                                <span class="text-sm font-bold text-amber-400">${cont.type}</span>
-                            </div>
-                            <div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h3 class="text-lg font-bold text-slate-900 font-mono tracking-tight">${cont.number}</h3>
-                                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${badgeClass}">${cont.status}</span>
-                                    <span class="text-xs text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono">BL: ${cont.bl || 'Pendiente'}</span>
-                                </div>
-                                <div class="text-xs text-slate-600 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
-                                    <span><i class="fa-solid fa-location-dot text-red-500 mr-1"></i> ${cont.pol} <i class="fa-solid fa-arrow-right mx-1 text-slate-400"></i> <strong>${cont.pod}</strong></span>
-                                    <span><i class="fa-regular fa-calendar text-slate-400 mr-1"></i> ETA: ${cont.eta}</span>
-                                    <span><i class="fa-solid fa-users text-slate-400 mr-1"></i> <strong>${clientsArray.length}</strong> Clientes consolidados</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                            <div class="w-full sm:w-48">
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span class="font-medium text-slate-600">Ocupación CBM</span>
-                                    <span class="font-bold text-slate-800">${totalContCbm.toFixed(1)} / ${cont.maxCbm} m³ (${fillPercent}%)</span>
-                                </div>
-                                <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                                    <div class="${barColor} h-2 rounded-full transition-all duration-500" style="width: ${fillPercent}%"></div>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-2">
-                                <button onclick="openAddCargoModal('${cont.id}')" class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition flex items-center justify-center gap-1.5">
-                                    <i class="fa-solid fa-plus"></i> Agregar Carga
-                                </button>
-                                <button onclick="editContainer('${cont.id}')" title="Editar Contenedor" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg border border-slate-200 bg-white transition">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                </button>
-                                <button onclick="deleteContainer('${cont.id}')" title="Eliminar Contenedor" class="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg border border-slate-200 bg-white transition">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="p-4 sm:p-6">
-                        ${clientsArray.length === 0 ? `
-                            <div class="text-center py-6 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">
-                                Contenedor vacío. Haz clic en <strong>"+ Agregar Carga"</strong> para asignar mercadería de un cliente.
-                            </div>
-                        ` : `
-                            <div class="space-y-4">
-                                ${clientsArray.map(group => `
-                                    <div class="border border-slate-200 rounded-xl overflow-hidden">
-                                        <div class="bg-amber-50/60 px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                                            <div class="flex items-center gap-2">
-                                                <span class="w-2.5 h-2.5 rounded-full bg-red-600"></span>
-                                                <span class="font-bold text-sm text-slate-800">${group.clientName}</span>
-                                                <span class="text-xs text-slate-500 font-mono">(${group.clientTax})</span>
-                                                ${group.shippingMark ? `<span class="text-[11px] bg-white border border-slate-200 px-2 py-0.5 rounded font-mono text-slate-600">Mark: ${group.shippingMark}</span>` : ''}
-                                            </div>
-                                            <div class="flex items-center gap-3">
-                                                <div class="text-xs text-slate-600 hidden sm:block">
-                                                    <strong>${group.subPkgs}</strong> bultos | <strong>${group.subCbm.toFixed(2)}</strong> m³ | <strong>${group.subWeight}</strong> kg | <strong class="text-slate-900">${formatCurrency(group.subVal)}</strong>
-                                                </div>
-                                                <button onclick="goToInvoice('${cont.id}', '${encodeURIComponent(group.clientName)}')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-sm transition flex items-center gap-1.5">
-                                                    <i class="fa-solid fa-file-invoice"></i> Generar Invoice
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div class="overflow-x-auto">
-                                            <table class="w-full text-left border-collapse">
-                                                <thead>
-                                                    <tr class="text-[11px] font-semibold text-slate-500 uppercase bg-slate-50/50 border-b border-slate-100">
-                                                        <th class="py-2 px-4">Descripción</th>
-                                                        <th class="py-2 px-3">HS Code</th>
-                                                        <th class="py-2 px-3 text-right">Bultos</th>
-                                                        <th class="py-2 px-3 text-right">CBM (m³)</th>
-                                                        <th class="py-2 px-3 text-right">Peso (kg)</th>
-                                                        <th class="py-2 px-3 text-right">Cant.</th>
-                                                        <th class="py-2 px-3 text-right">P. Unit</th>
-                                                        <th class="py-2 px-4 text-right">Total USD</th>
-                                                        <th class="py-2 px-2 text-center"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody class="divide-y divide-slate-100 text-xs">
-                                                    ${group.items.map(item => `
-                                                        <tr class="hover:bg-slate-50">
-                                                            <td class="py-2.5 px-4 font-medium text-slate-800">${item.description}</td>
-                                                            <td class="py-2.5 px-3 font-mono text-slate-500">${item.hsCode || '-'}</td>
-                                                            <td class="py-2.5 px-3 text-right">${item.pkgs}</td>
-                                                            <td class="py-2.5 px-3 text-right">${item.cbm.toFixed(2)}</td>
-                                                            <td class="py-2.5 px-3 text-right">${item.weight}</td>
-                                                            <td class="py-2.5 px-3 text-right">${item.qty}</td>
-                                                            <td class="py-2.5 px-3 text-right">${formatCurrency(item.unitPrice)}</td>
-                                                            <td class="py-2.5 px-4 text-right font-semibold text-slate-900">${formatCurrency(item.qty * item.unitPrice)}</td>
-                                                            <td class="py-2.5 px-2 text-center">
-                                                                <button onclick="deleteCargoItem('${cont.id}', '${item.id}')" title="Quitar ítem" class="text-slate-400 hover:text-red-500 p-1">
-                                                                    <i class="fa-solid fa-xmark"></i>
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    `).join('')}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-
-                            <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-between items-center text-xs text-slate-600 gap-2">
-                                <span>Consolidación total del contenedor <strong>${cont.number}</strong>:</span>
-                                <div class="flex flex-wrap gap-4 font-semibold text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg">
-                                    <span>Total Bultos: ${totalContPkgs}</span>
-                                    <span>Volumen: ${totalContCbm.toFixed(2)} m³</span>
-                                    <span>Peso Bruto: ${totalContWeight.toLocaleString()} kg</span>
-                                    <span class="text-red-700">Valor FOB Total: ${formatCurrency(totalContVal)}</span>
-                                </div>
-                            </div>
-                        `}
-                    </div>
-                </div>
-                `;
-            }).join('');
-        };
-
-        // ==========================================
-        // GESTIÓN DE CONTENEDORES (CRUD + NUBE)
-        // ==========================================
-        window.openNewContainerModal = function() {
-            document.getElementById('modal-container-title').innerText = "Registrar Nuevo Contenedor";
-            document.getElementById('cont-id').value = "";
-            document.getElementById('cont-number').value = "";
-            document.getElementById('cont-type').value = "40HQ";
-            document.getElementById('cont-bl').value = "";
-            document.getElementById('cont-status').value = "Consolidando";
-            document.getElementById('cont-pol').value = "Ningbo, China";
-            document.getElementById('cont-pod').value = "Buenos Aires, Argentina";
-            
-            const futureDate = new Date();
-            futureDate.setDate(futureDate.getDate() + 35);
-            document.getElementById('cont-eta').value = futureDate.toISOString().split('T')[0];
-
-            document.getElementById('modal-container').classList.remove('hidden');
-        };
-
-        window.editContainer = function(id) {
-            const cont = containers.find(c => c.id === id);
-            if (!cont) return;
-
-            document.getElementById('modal-container-title').innerText = "Editar Contenedor";
-            document.getElementById('cont-id').value = cont.id;
-            document.getElementById('cont-number').value = cont.number;
-            document.getElementById('cont-type').value = cont.type;
-            document.getElementById('cont-bl').value = cont.bl;
-            document.getElementById('cont-status').value = cont.status;
-            document.getElementById('cont-pol').value = cont.pol;
-            document.getElementById('cont-pod').value = cont.pod;
-            document.getElementById('cont-eta').value = cont.eta;
-
-            document.getElementById('modal-container').classList.remove('hidden');
-        };
-
-        window.saveContainer = async function(e) {
-            e.preventDefault();
-            const id = document.getElementById('cont-id').value;
-            const typeSelect = document.getElementById('cont-type');
-            const maxCbm = parseFloat(typeSelect.options[typeSelect.selectedIndex].getAttribute('data-cbm'));
-
-            const contData = {
-                number: document.getElementById('cont-number').value.toUpperCase().trim(),
-                type: typeSelect.value,
-                maxCbm: maxCbm,
-                bl: document.getElementById('cont-bl').value.toUpperCase().trim(),
-                status: document.getElementById('cont-status').value,
-                pol: document.getElementById('cont-pol').value.trim(),
-                pod: document.getElementById('cont-pod').value.trim(),
-                eta: document.getElementById('cont-eta').value
-            };
-
-            if (id) {
-                const existing = containers.find(c => c.id === id);
-                if (existing) {
-                    const updated = { ...existing, ...contData };
-                    await syncContainerToCloud(updated);
-                    showToast(`Contenedor ${contData.number} actualizado en la nube`);
-                }
-            } else {
-                const newCont = {
-                    id: 'cont-' + Date.now(),
-                    createdAt: Date.now(),
-                    ...contData,
-                    items: []
-                };
-                await syncContainerToCloud(newCont);
-                showToast(`Contenedor ${contData.number} guardado en la nube`);
-            }
-
-            closeModal('modal-container');
-        };
-
-        window.deleteContainer = async function(id) {
-            const cont = containers.find(c => c.id === id);
-            if (!cont) return;
-            await removeContainerFromCloud(id);
-            showToast(`Contenedor ${cont.number} eliminado de la nube`, 'error');
-        };
-
-        // ==========================================
-        // GESTIÓN DE CARGA POR CLIENTE
-        // ==========================================
-        window.openAddCargoModal = function(containerId) {
-            const cont = containers.find(c => c.id === containerId);
-            if (!cont) return;
-
-            document.getElementById('cargo-container-id').value = containerId;
-            document.getElementById('modal-cargo-subtitle').innerText = `Contenedor: ${cont.number} (${cont.type}) - Destino: ${cont.pod}`;
-            
-            const datalist = document.getElementById('existing-clients-list');
-            const uniqueClients = new Set();
-            containers.forEach(c => (c.items || []).forEach(i => uniqueClients.add(i.clientName)));
-            datalist.innerHTML = Array.from(uniqueClients).map(name => `<option value="${name}">`).join('');
-
-            document.getElementById('cargo-desc').value = "";
-            document.getElementById('cargo-hs').value = "";
-            window.calcCargoTotal();
-
-            document.getElementById('modal-cargo').classList.remove('hidden');
-        };
-
-        window.calcCargoTotal = function() {
-            const qty = parseFloat(document.getElementById('cargo-qty').value) || 0;
-            const price = parseFloat(document.getElementById('cargo-price').value) || 0;
-            document.getElementById('cargo-total-preview').value = formatCurrency(qty * price);
-        };
-
-        window.saveCargoItem = async function(e) {
-            e.preventDefault();
-            const contId = document.getElementById('cargo-container-id').value;
-            const cont = containers.find(c => c.id === contId);
-            if (!cont) return;
-
-            const newItem = {
-                id: 'item-' + Date.now(),
-                clientName: document.getElementById('cargo-client-name').value.trim(),
-                clientTax: document.getElementById('cargo-client-tax').value.trim(),
-                clientAddress: document.getElementById('cargo-client-address').value.trim(),
-                shippingMark: document.getElementById('cargo-mark').value.toUpperCase().trim(),
-                description: document.getElementById('cargo-desc').value.trim(),
-                hsCode: document.getElementById('cargo-hs').value.trim(),
-                pkgs: parseInt(document.getElementById('cargo-pkgs').value),
-                cbm: parseFloat(document.getElementById('cargo-cbm').value),
-                weight: parseFloat(document.getElementById('cargo-weight').value),
-                qty: parseInt(document.getElementById('cargo-qty').value),
-                unitPrice: parseFloat(document.getElementById('cargo-price').value)
-            };
-
-            const updatedItems = [...(cont.items || []), newItem];
-            await syncContainerToCloud({ ...cont, items: updatedItems });
-            
-            closeModal('modal-cargo');
-            showToast(`Carga de "${newItem.clientName}" consolidada y guardada`);
-        };
-
-        window.deleteCargoItem = async function(contId, itemId) {
-            const cont = containers.find(c => c.id === contId);
-            if (!cont) return;
-            const updatedItems = (cont.items || []).filter(i => i.id !== itemId);
-            await syncContainerToCloud({ ...cont, items: updatedItems });
-            showToast("Ítem removido del contenedor", "error");
-        };
-
-        // ==========================================
-        // GENERADOR AUTOMÁTICO DE INVOICES
-        // ==========================================
-        window.goToInvoice = function(containerId, encodedClientName) {
-            window.switchTab('invoices');
-            const contSelect = document.getElementById('inv-select-container');
-            contSelect.value = containerId;
-            window.onInvoiceContainerChange(decodeURIComponent(encodedClientName));
-        };
-
-        window.populateInvoiceSelectors = function() {
-            const contSelect = document.getElementById('inv-select-container');
-            const currentVal = contSelect.value;
-
-            if (containers.length === 0) {
-                contSelect.innerHTML = `<option value="">No hay contenedores</option>`;
-                document.getElementById('inv-select-client').innerHTML = `<option value="">Sin clientes</option>`;
-                document.getElementById('invoice-printable-area').innerHTML = `<p class="text-center text-slate-400 py-10">Agrega contenedores y mercadería para generar facturas.</p>`;
-                return;
-            }
-
-            contSelect.innerHTML = containers.map(c => 
-                `<option value="${c.id}">${c.number} (${c.type}) - ${c.pod}</option>`
-            ).join('');
-
-            if (currentVal && containers.some(c => c.id === currentVal)) {
-                contSelect.value = currentVal;
-            }
-
-            window.onInvoiceContainerChange();
-        };
-
-        window.onInvoiceContainerChange = function(preselectClient = null) {
-            const contId = document.getElementById('inv-select-container').value;
-            const clientSelect = document.getElementById('inv-select-client');
-            const cont = containers.find(c => c.id === contId);
-
-            if (!cont || !(cont.items && cont.items.length > 0)) {
-                clientSelect.innerHTML = `<option value="">Este contenedor no tiene clientes</option>`;
-                document.getElementById('invoice-printable-area').innerHTML = `
-                    <div class="text-center py-12 text-slate-400">
-                        <i class="fa-solid fa-file-circle-exclamation text-3xl mb-3"></i>
-                        <p>El contenedor seleccionado no tiene mercadería consolidada aún.</p>
-                    </div>`;
-                return;
-            }
-
-            const uniqueClients = [...new Set(cont.items.map(i => i.clientName))];
-            clientSelect.innerHTML = uniqueClients.map(name => 
-                `<option value="${name}">${name}</option>`
-            ).join('');
-
-            if (preselectClient && uniqueClients.includes(preselectClient)) {
-                clientSelect.value = preselectClient;
-            }
-
-            const randomNum = Math.floor(1000 + Math.random() * 9000);
-            document.getElementById('inv-number').value = `DCAM-2026-${randomNum}`;
-
-            window.generateInvoicePreview();
-        };
-
-        window.generateInvoicePreview = function() {
-            const contId = document.getElementById('inv-select-container').value;
-            const clientName = document.getElementById('inv-select-client').value;
-            const docType = document.getElementById('inv-doc-type').value;
-            const incoterm = document.getElementById('inv-incoterm').value;
-            const freightCost = parseFloat(document.getElementById('inv-freight').value) || 0;
-            const paymentTerms = document.getElementById('inv-payment').value;
-            const invNumber = document.getElementById('inv-number').value;
-
-            const cont = containers.find(c => c.id === contId);
-            const area = document.getElementById('invoice-printable-area');
-
-            if (!cont || !clientName) return;
-
-            const clientItems = (cont.items || []).filter(i => i.clientName === clientName);
-            if (clientItems.length === 0) return;
-
-            const clientInfo = clientItems[0];
-            const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-            let subtotal = 0;
-            let totalPkgs = 0;
-            let totalWeight = 0;
-            let totalCbm = 0;
-            let totalQty = 0;
-
-            clientItems.forEach(item => {
-                subtotal += (item.qty * item.unitPrice);
-                totalPkgs += item.pkgs;
-                totalWeight += item.weight;
-                totalCbm += item.cbm;
-                totalQty += item.qty;
-            });
-
-            const grandTotal = subtotal + freightCost;
-
-            area.innerHTML = `
-                <!-- Encabezado de la Factura con Logo Oficial De China al Mundo -->
-                <div class="flex flex-col sm:flex-row justify-between items-start border-b-2 border-red-600 pb-6 gap-6">
-                    <div class="flex items-start gap-4">
-                        <div class="w-28 h-20 shrink-0 flex items-center justify-center">
-                            <svg viewBox="0 0 220 140" class="w-full h-full">
-                                <path d="M 35 75 C 15 115, 75 135, 135 125 C 195 115, 215 70, 160 45 C 195 70, 175 105, 125 112 C 75 120, 30 102, 35 75 Z" fill="#EAB308"/>
-                                <path d="M 55 45 L 95 38 L 105 22 L 110 37 L 155 30 L 112 44 L 115 52 L 100 52 L 95 45 Z" fill="#DC2626"/>
-                                <circle cx="82" cy="49" r="5" fill="#DC2626"/><circle cx="82" cy="49" r="2.5" fill="#EAB308"/>
-                                <circle cx="128" cy="43" r="5" fill="#DC2626"/><circle cx="128" cy="43" r="2.5" fill="#EAB308"/>
-                                <text x="112" y="76" font-family="Inter, sans-serif" font-weight="900" font-size="22" fill="#DC2626" text-anchor="middle">DE CHINA</text>
-                                <text x="112" y="96" font-family="Inter, sans-serif" font-weight="800" font-size="16" fill="#EAB308" text-anchor="middle">AL MUNDO</text>
-                            </svg>
-                        </div>
-                        <div>
-                            <h1 class="text-xl font-extrabold tracking-tight uppercase text-red-700">${companySettings.name}</h1>
-                            <p class="text-xs text-slate-600 mt-0.5">${companySettings.address}</p>
-                            <p class="text-xs text-slate-600">Tax ID / Reg: <span class="font-mono font-semibold">${companySettings.taxId}</span></p>
-                            <p class="text-xs text-slate-600">Tel: ${companySettings.phone} | Email: ${companySettings.email}</p>
-                        </div>
-                    </div>
-                    <div class="sm:text-right">
-                        <span class="inline-block bg-red-600 text-white text-xs font-bold px-3 py-1 rounded uppercase tracking-wider mb-2">
-                            ${docType}
-                        </span>
-                        <p class="text-sm font-bold text-slate-800">No.: <span class="font-mono text-red-700">${invNumber}</span></p>
-                        <p class="text-xs text-slate-600">Date: <strong>${today}</strong></p>
-                        <p class="text-xs text-slate-600">Container No.: <strong class="font-mono">${cont.number}</strong> (${cont.type})</p>
-                        <p class="text-xs text-slate-600">B/L No.: <strong class="font-mono">${cont.bl || 'N/A'}</strong></p>
-                    </div>
-                </div>
-
-                <!-- Datos del Consignatario (Cliente) y Logística -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 py-6 border-b border-slate-200 text-xs">
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <p class="font-bold text-slate-500 uppercase tracking-wider mb-1.5">BILL TO / CONSIGNEE:</p>
-                        <p class="text-sm font-bold text-slate-900">${clientInfo.clientName}</p>
-                        <p class="text-slate-700 mt-1">Tax ID / CUIT / RUT: <strong class="font-mono">${clientInfo.clientTax}</strong></p>
-                        <p class="text-slate-700 mt-0.5">${clientInfo.clientAddress || 'Address on file'}</p>
-                        ${clientInfo.shippingMark ? `<p class="text-slate-700 mt-1.5">Shipping Marks: <span class="font-mono bg-white px-1.5 py-0.5 border border-slate-300 rounded">${clientInfo.shippingMark}</span></p>` : ''}
-                    </div>
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-1.5">
-                        <p class="font-bold text-slate-500 uppercase tracking-wider mb-1.5">SHIPMENT DETAILS:</p>
-                        <div class="flex justify-between"><span class="text-slate-500">Port of Loading (POL):</span> <strong class="text-slate-800">${cont.pol}</strong></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Port of Discharge (POD):</span> <strong class="text-slate-800">${cont.pod}</strong></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Estimated Arrival (ETA):</span> <strong class="text-slate-800">${cont.eta}</strong></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Trade Term (Incoterm):</span> <strong class="text-red-700">${incoterm} ${incoterm === 'FOB' ? cont.pol : cont.pod}</strong></div>
-                        <div class="flex justify-between"><span class="text-slate-500">Payment Terms:</span> <strong class="text-slate-800">${paymentTerms}</strong></div>
-                    </div>
-                </div>
-
-                <!-- Tabla de Productos Facturados -->
-                <div class="py-6">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
-                                <th class="py-2.5 px-3 rounded-tl-md">#</th>
-                                <th class="py-2.5 px-3">Description of Goods</th>
-                                <th class="py-2.5 px-3">HS Code</th>
-                                <th class="py-2.5 px-3 text-right">Pkgs</th>
-                                <th class="py-2.5 px-3 text-right">G.W. (KG)</th>
-                                <th class="py-2.5 px-3 text-right">CBM</th>
-                                <th class="py-2.5 px-3 text-right">Qty (PCS)</th>
-                                <th class="py-2.5 px-3 text-right">Unit Price</th>
-                                <th class="py-2.5 px-3 text-right rounded-tr-md">Amount (USD)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200 text-xs">
-                            ${clientItems.map((item, index) => `
-                                <tr>
-                                    <td class="py-3 px-3 text-slate-500">${index + 1}</td>
-                                    <td class="py-3 px-3 font-semibold text-slate-800">${item.description}</td>
-                                    <td class="py-3 px-3 font-mono text-slate-600">${item.hsCode || '-'}</td>
-                                    <td class="py-3 px-3 text-right">${item.pkgs}</td>
-                                    <td class="py-3 px-3 text-right">${item.weight.toLocaleString()}</td>
-                                    <td class="py-3 px-3 text-right">${item.cbm.toFixed(2)}</td>
-                                    <td class="py-3 px-3 text-right font-medium">${item.qty.toLocaleString()}</td>
-                                    <td class="py-3 px-3 text-right">${formatCurrency(item.unitPrice)}</td>
-                                    <td class="py-3 px-3 text-right font-bold text-slate-900">${formatCurrency(item.qty * item.unitPrice)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                        <tfoot>
-                            <tr class="bg-amber-50/80 font-bold text-xs text-slate-800 border-t-2 border-amber-400">
-                                <td colspan="3" class="py-2.5 px-3 text-right uppercase">Total Packing Summary:</td>
-                                <td class="py-2.5 px-3 text-right">${totalPkgs} CTNS</td>
-                                <td class="py-2.5 px-3 text-right">${totalWeight.toLocaleString()} KG</td>
-                                <td class="py-2.5 px-3 text-right">${totalCbm.toFixed(2)} m³</td>
-                                <td class="py-2.5 px-3 text-right">${totalQty.toLocaleString()} PCS</td>
-                                <td class="py-2.5 px-3 text-right">SUBTOTAL:</td>
-                                <td class="py-2.5 px-3 text-right">${formatCurrency(subtotal)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <!-- Totales y Datos Bancarios -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2 items-start">
-                    <div class="text-xs text-slate-600 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <p class="font-bold text-slate-800 uppercase mb-1">Beneficiary Bank Details:</p>
-                        <p class="font-mono text-[11px] leading-relaxed">${companySettings.bankDetails}</p>
-                        <p class="mt-3 text-[11px] text-slate-500 italic">We certify that the goods mentioned above are of true origin and value as stated.</p>
-                    </div>
-
-                    <div class="space-y-2 text-xs">
-                        <div class="flex justify-between py-1.5 border-b border-slate-100">
-                            <span class="text-slate-600">Merchandise Subtotal (${incoterm}):</span>
-                            <span class="font-semibold text-slate-800">${formatCurrency(subtotal)}</span>
-                        </div>
-                        <div class="flex justify-between py-1.5 border-b border-slate-100">
-                            <span class="text-slate-600">International Freight & Insurance:</span>
-                            <span class="font-semibold text-slate-800">${formatCurrency(freightCost)}</span>
-                        </div>
-                        <div class="flex justify-between py-3 px-4 bg-red-600 text-white rounded-lg text-sm font-bold">
-                            <span>TOTAL PAYABLE (USD):</span>
-                            <span>${formatCurrency(grandTotal)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Firma -->
-                <div class="mt-12 pt-6 flex justify-end">
-                    <div class="w-64 text-center border-t border-slate-400 pt-2">
-                        <p class="text-xs font-bold text-red-700 uppercase">${companySettings.name}</p>
-                        <p class="text-[11px] text-slate-500">Authorized Signature & Company Stamp</p>
-                    </div>
-                </div>
-            `;
-        };
-
-        // ==========================================
-        // CONFIGURACIÓN DE LA COMPAÑÍA (+ NUBE)
-        // ==========================================
-        window.loadCompanyForm = function() {
-            document.getElementById('comp-name').value = companySettings.name;
-            document.getElementById('comp-tax').value = companySettings.taxId;
-            document.getElementById('comp-address').value = companySettings.address;
-            document.getElementById('comp-phone').value = companySettings.phone;
-            document.getElementById('comp-email').value = companySettings.email;
-            document.getElementById('comp-bank').value = companySettings.bankDetails;
-        };
-
-        window.saveCompanySettings = async function(e) {
-            e.preventDefault();
-            companySettings = {
-                name: document.getElementById('comp-name').value.trim(),
-                taxId: document.getElementById('comp-tax').value.trim(),
-                address: document.getElementById('comp-address').value.trim(),
-                phone: document.getElementById('comp-phone').value.trim(),
-                email: document.getElementById('comp-email').value.trim(),
-                bankDetails: document.getElementById('comp-bank').value.trim()
-            };
-
-            if (currentUser && db) {
-                try {
-                    const companyDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'company_profile');
-                    await setDoc(companyDocRef, companySettings);
-                    showToast("Datos de De China al Mundo guardados en la nube");
-                } catch (err) {
-                    console.error("Error guardando perfil:", err);
-                    showToast("Error al guardar en la nube", "error");
-                }
-            } else {
-                showToast("Datos actualizados localmente");
-            }
-            window.generateInvoicePreview();
-        };
-    </script>
+  </div>
+
+  <!-- MODAL AGREGAR / EDITAR MERCADERÍA -->
+  <div id="modal-cargo" class="hidden fixed inset-0 bg-slate-900/50 z-40 flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-xl max-w-2xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+      <h3 id="modal-cargo-title" class="text-lg font-bold text-slate-900 mb-4">Agregar Mercadería al Contenedor</h3>
+      <form onsubmit="saveCargoItem(event)" class="space-y-4">
+        <input type="hidden" id="cargo-id" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cliente / Consignatario *</label>
+            <input id="cargo-client" type="text" required placeholder="Ej: Juan Pérez / Importadora SRL" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CUIT / DNI del Cliente</label>
+            <input id="cargo-tax" type="text" placeholder="20-12345678-9" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dirección del Cliente</label>
+            <input id="cargo-address" type="text" placeholder="Av. Colón 1234, Córdoba" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción de Mercadería *</label>
+            <input id="cargo-desc" type="text" required placeholder="Ej: Accesorios para celulares / Repuestos" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">NCM / HS Code</label>
+            <input id="cargo-hs" type="text" placeholder="8517.79.00" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Bultos / Cajas *</label>
+            <input id="cargo-pkg" type="number" min="1" required value="1" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Peso Bruto (KG) *</label>
+            <input id="cargo-weight" type="number" step="0.01" required value="0" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Volumen (CBM) *</label>
+            <input id="cargo-cbm" type="number" step="0.001" required value="0" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Precio Unit. USD *</label>
+            <input id="cargo-price" type="number" step="0.01" required value="0" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Shipping Mark (Marca de Bulto)</label>
+          <input id="cargo-mark" type="text" value="DE CHINA AL MUNDO" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3">
+          <button type="button" onclick="closeModals()" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700">Guardar Mercadería</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL / VISTA PREVIA DE COMMERCIAL INVOICE -->
+  <div id="modal-invoice" class="hidden fixed inset-0 bg-slate-900/70 z-50 overflow-y-auto p-4">
+    <div class="max-w-4xl mx-auto my-6">
+      <!-- Barra superior de controles (No se imprime) -->
+      <div class="bg-slate-800 text-white px-6 py-3 rounded-t-xl flex flex-wrap items-center justify-between gap-3 no-print">
+        <div class="flex items-center gap-3">
+          <span class="font-bold text-sm">Vista Previa Commercial Invoice</span>
+          <select id="inv-incoterm" onchange="renderInvoicePreview()" class="bg-slate-700 text-white text-xs rounded px-2 py-1 border border-slate-600">
+            <option value="FOB">Incoterm: FOB</option>
+            <option value="CIF">Incoterm: CIF</option>
+            <option value="EXW">Incoterm: EXW</option>
+            <option value="ALL-IN">Servicio: ALL-IN</option>
+          </select>
+          <input id="inv-freight" type="number" step="0.01" value="0" onchange="renderInvoicePreview()" placeholder="Flete Extra USD" class="bg-slate-700 text-white text-xs rounded px-2 py-1 w-32 border border-slate-600" />
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold">
+            🖨️ Imprimir / Guardar PDF
+          </button>
+          <button onclick="closeModals()" class="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
+            Cerrar
+          </button>
+        </div>
+      </div>
+
+      <!-- HOJA A4 IMPRIMIBLE -->
+      <div id="invoice-print-area" class="bg-white p-10 shadow-2xl rounded-b-xl text-slate-900">
+        <!-- Se llena dinámicamente -->
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DE APLICACIÓN CON SUPABASE -->
+  <script>
+    let containers = [];
+    let currentContainer = null;
+    let currentCargoItems = [];
+    let companySettings = {};
+    let activeInvoiceClient = null;
+
+    const CAPACITIES = { '20GP': 33, '40GP': 67, '40HQ': 76, '45HQ': 86 };
+
+    // Inicializar
+    async function init() {
+      await loadCompanySettings();
+      await loadContainers();
+    }
+
+    function switchTab(tab) {
+      document.getElementById('view-containers').classList.toggle('hidden', tab !== 'containers');
+      document.getElementById('view-company').classList.toggle('hidden', tab !== 'company');
+      document.getElementById('tab-containers').className = tab === 'containers'
+        ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white shadow-sm'
+        : 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100';
+      document.getElementById('tab-company').className = tab === 'company'
+        ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white shadow-sm'
+        : 'px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100';
+    }
+
+    // --- DATOS EMPRESA ---
+    async function loadCompanySettings() {
+      const { data, error } = await sb.from('company_settings').select('*').eq('id', 1).single();
+      if (error) {
+        document.getElementById('db-status').innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> Error de conexión Supabase';
+        return;
+      }
+      companySettings = data;
+      document.getElementById('comp-name').value = data.name || '';
+      document.getElementById('comp-subtitle').value = data.subtitle || '';
+      document.getElementById('comp-china').value = data.china_warehouse || '';
+      document.getElementById('comp-arg').value = data.arg_warehouse || '';
+      document.getElementById('comp-email').value = data.contact_email || '';
+      document.getElementById('comp-tax').value = data.tax_id || '';
+      document.getElementById('comp-bank').value = data.bank_details || '';
+    }
+
+    async function saveCompanySettings(e) {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('comp-name').value,
+        subtitle: document.getElementById('comp-subtitle').value,
+        china_warehouse: document.getElementById('comp-china').value,
+        arg_warehouse: document.getElementById('comp-arg').value,
+        contact_email: document.getElementById('comp-email').value,
+        tax_id: document.getElementById('comp-tax').value,
+        bank_details: document.getElementById('comp-bank').value,
+        updated_at: new Date()
+      };
+      const { error } = await sb.from('company_settings').update(payload).eq('id', 1);
+      if (error) return alert('Error al guardar: ' + error.message);
+      companySettings = { ...companySettings, ...payload };
+      alert('Datos de la empresa actualizados correctamente.');
+    }
+
+    // --- CONTENEDORES ---
+    async function loadContainers() {
+      const { data, error } = await sb.from('containers').select('*').order('created_at', { ascending: false });
+      if (error) return console.error(error);
+      containers = data;
+      renderContainersGrid();
+      if (currentContainer) {
+        const updated = containers.find(c => c.id === currentContainer.id);
+        if (updated) selectContainer(updated);
+      } else if (containers.length > 0) {
+        selectContainer(containers[0]);
+      }
+    }
+
+    function renderContainersGrid() {
+      const grid = document.getElementById('containers-grid');
+      if (containers.length === 0) {
+        grid.innerHTML = `<div class="col-span-3 bg-white p-8 rounded-xl border border-dashed border-slate-300 text-center text-slate-500">
+          No hay contenedores cargados aún. Hacé clic en <strong>"+ Nuevo Contenedor"</strong> para empezar.
+        </div>`;
+        return;
+      }
+      grid.innerHTML = containers.map(c => {
+        const isSelected = currentContainer && currentContainer.id === c.id;
+        return `
+          <div onclick='selectContainer(${JSON.stringify(c)})' class="cursor-pointer p-5 rounded-xl border transition-all ${isSelected ? 'bg-red-50/50 border-red-500 ring-2 ring-red-500/20' : 'bg-white border-slate-200 hover:border-slate-300'}">
+            <div class="flex justify-between items-start">
+              <span class="font-extrabold text-lg text-slate-900">${c.container_number}</span>
+              <span class="px-2 py-0.5 text-xs font-bold rounded bg-slate-100 text-slate-700">${c.container_type}</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">BL: ${c.bl_number || 'Sin BL'} • ETA: ${c.eta || 'A definir'}</p>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">${c.status}</span>
+              <span class="text-xs font-bold text-red-600">Ver carga →</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function selectContainer(container) {
+      currentContainer = container;
+      renderContainersGrid();
+      document.getElementById('container-detail').classList.remove('hidden');
+      document.getElementById('det-number').textContent = container.container_number;
+      document.getElementById('det-type').textContent = container.container_type;
+      document.getElementById('det-status').textContent = container.status;
+      document.getElementById('det-route').textContent = `${container.pol} → ${container.pod} | BL: ${container.bl_number || '-'} | ETA: ${container.eta || '-'}`;
+
+      const { data, error } = await sb.from('cargo_items').select('*').eq('container_id', container.id).order('created_at', { ascending: true });
+      if (error) return console.error(error);
+      currentCargoItems = data;
+      renderGroupedCargo();
+    }
+
+    function renderGroupedCargo() {
+      const maxCbm = CAPACITIES[currentContainer.container_type] || 68;
+      const totalCbm = currentCargoItems.reduce((acc, item) => acc + Number(item.cbm), 0);
+      const pct = Math.min(100, Math.round((totalCbm / maxCbm) * 100));
+
+      document.getElementById('det-capacity-text').textContent = `${totalCbm.toFixed(2)} / ${maxCbm} CBM (${pct}%)`;
+      document.getElementById('det-capacity-bar').style.width = `${pct}%`;
+
+      const listEl = document.getElementById('clients-grouped-list');
+      if (currentCargoItems.length === 0) {
+        listEl.innerHTML = `<p class="text-center text-sm text-slate-400 py-8">Este contenedor todavía no tiene mercadería consolidada.</p>`;
+        return;
+      }
+
+      // Agrupar por cliente
+      const grouped = {};
+      currentCargoItems.forEach(item => {
+        const key = item.client_name.trim();
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(item);
+      });
+
+      listEl.innerHTML = Object.entries(grouped).map(([clientName, items]) => {
+        const sumPkg = items.reduce((s, i) => s + Number(i.packages), 0);
+        const sumKg = items.reduce((s, i) => s + Number(i.gross_weight), 0);
+        const sumCbm = items.reduce((s, i) => s + Number(i.cbm), 0);
+        const sumUsd = items.reduce((s, i) => s + Number(i.total_value), 0);
+
+        return `
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div class="bg-slate-100 px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 class="font-bold text-slate-900 text-base">${clientName}</h4>
+                <p class="text-xs text-slate-500">
+                  Total: <strong>${sumPkg} bultos</strong> • <strong>${sumKg.toFixed(2)} KG</strong> • <strong>${sumCbm.toFixed(3)} CBM</strong> • Valor: <strong class="text-emerald-700">USD ${sumUsd.toFixed(2)}</strong>
+                </p>
+              </div>
+              <button onclick="openInvoiceModal('${clientName.replace(/'/g, "\\'")}')" class="bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm">
+                📄 Generar Invoice
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
+                  <tr>
+                    <th class="px-4 py-2.5">Descripción</th>
+                    <th class="px-4 py-2.5">HS Code</th>
+                    <th class="px-4 py-2.5 text-right">Bultos</th>
+                    <th class="px-4 py-2.5 text-right">Peso (KG)</th>
+                    <th class="px-4 py-2.5 text-right">CBM</th>
+                    <th class="px-4 py-2.5 text-right">Unit. USD</th>
+                    <th class="px-4 py-2.5 text-right">Total USD</th>
+                    <th class="px-4 py-2.5 text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${items.map(item => `
+                    <tr class="hover:bg-slate-50">
+                      <td class="px-4 py-2.5 font-medium text-slate-800">${item.description}</td>
+                      <td class="px-4 py-2.5 text-slate-500 text-xs">${item.hs_code || '-'}</td>
+                      <td class="px-4 py-2.5 text-right">${item.packages}</td>
+                      <td class="px-4 py-2.5 text-right">${Number(item.gross_weight).toFixed(2)}</td>
+                      <td class="px-4 py-2.5 text-right">${Number(item.cbm).toFixed(3)}</td>
+                      <td class="px-4 py-2.5 text-right">$${Number(item.unit_price).toFixed(2)}</td>
+                      <td class="px-4 py-2.5 text-right font-semibold">$${Number(item.total_value).toFixed(2)}</td>
+                      <td class="px-4 py-2.5 text-center whitespace-nowrap">
+                        <button onclick='openCargoModal(${JSON.stringify(item)})' class="text-blue-600 hover:underline text-xs font-semibold mr-2">Editar</button>
+                        <button onclick="deleteCargoItem('${item.id}')" class="text-red-600 hover:underline text-xs font-semibold">Borrar</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- MODALES Y CRUD ---
+    function openContainerModal(cont = null) {
+      document.getElementById('modal-container-title').textContent = cont ? 'Editar Contenedor' : 'Nuevo Contenedor';
+      document.getElementById('cont-id').value = cont ? cont.id : '';
+      document.getElementById('cont-number').value = cont ? cont.container_number : '';
+      document.getElementById('cont-type').value = cont ? cont.container_type : '40HQ';
+      document.getElementById('cont-bl').value = cont ? (cont.bl_number || '') : '';
+      document.getElementById('cont-eta').value = cont ? (cont.eta || '') : '';
+      document.getElementById('cont-pol').value = cont ? cont.pol : 'Guangzhou, China';
+      document.getElementById('cont-pod').value = cont ? cont.pod : 'Buenos Aires, Argentina';
+      document.getElementById('cont-status').value = cont ? cont.status : 'En Consolidación';
+      document.getElementById('modal-container').classList.remove('hidden');
+    }
+
+    async function saveContainer(e) {
+      e.preventDefault();
+      const id = document.getElementById('cont-id').value;
+      const payload = {
+        container_number: document.getElementById('cont-number').value.toUpperCase(),
+        container_type: document.getElementById('cont-type').value,
+        bl_number: document.getElementById('cont-bl').value,
+        eta: document.getElementById('cont-eta').value || null,
+        pol: document.getElementById('cont-pol').value,
+        pod: document.getElementById('cont-pod').value,
+        status: document.getElementById('cont-status').value
+      };
+
+      const { error } = id
+        ? await sb.from('containers').update(payload).eq('id', id)
+        : await sb.from('containers').insert([payload]);
+
+      if (error) return alert('Error: ' + error.message);
+      closeModals();
+      await loadContainers();
+    }
+
+    async function deleteContainer(id) {
+      if (!confirm('¿Seguro que querés eliminar este contenedor y toda su carga?')) return;
+      const { error } = await sb.from('containers').delete().eq('id', id);
+      if (error) return alert('Error: ' + error.message);
+      currentContainer = null;
+      document.getElementById('container-detail').classList.add('hidden');
+      await loadContainers();
+    }
+
+    function openCargoModal(item = null) {
+      document.getElementById('modal-cargo-title').textContent = item ? 'Editar Mercadería' : 'Agregar Mercadería al Contenedor';
+      document.getElementById('cargo-id').value = item ? item.id : '';
+      document.getElementById('cargo-client').value = item ? item.client_name : '';
+      document.getElementById('cargo-tax').value = item ? (item.client_tax_id || '') : '';
+      document.getElementById('cargo-address').value = item ? (item.client_address || '') : '';
+      document.getElementById('cargo-desc').value = item ? item.description : '';
+      document.getElementById('cargo-hs').value = item ? (item.hs_code || '') : '';
+      document.getElementById('cargo-pkg').value = item ? item.packages : 1;
+      document.getElementById('cargo-weight').value = item ? item.gross_weight : 0;
+      document.getElementById('cargo-cbm').value = item ? item.cbm : 0;
+      document.getElementById('cargo-price').value = item ? item.unit_price : 0;
+      document.getElementById('cargo-mark').value = item ? (item.shipping_mark || 'DE CHINA AL MUNDO') : 'DE CHINA AL MUNDO';
+      document.getElementById('modal-cargo').classList.remove('hidden');
+    }
+
+    async function saveCargoItem(e) {
+      e.preventDefault();
+      const id = document.getElementById('cargo-id').value;
+      const payload = {
+        container_id: currentContainer.id,
+        client_name: document.getElementById('cargo-client').value.trim(),
+        client_tax_id: document.getElementById('cargo-tax').value.trim(),
+        client_address: document.getElementById('cargo-address').value.trim(),
+        description: document.getElementById('cargo-desc').value.trim(),
+        hs_code: document.getElementById('cargo-hs').value.trim(),
+        packages: parseInt(document.getElementById('cargo-pkg').value, 10),
+        gross_weight: parseFloat(document.getElementById('cargo-weight').value),
+        cbm: parseFloat(document.getElementById('cargo-cbm').value),
+        unit_price: parseFloat(document.getElementById('cargo-price').value),
+        shipping_mark: document.getElementById('cargo-mark').value.trim()
+      };
+
+      const { error } = id
+        ? await sb.from('cargo_items').update(payload).eq('id', id)
+        : await sb.from('cargo_items').insert([payload]);
+
+      if (error) return alert('Error al guardar mercadería: ' + error.message);
+      closeModals();
+      await selectContainer(currentContainer);
+    }
+
+    async function deleteCargoItem(id) {
+      if (!confirm('¿Eliminar este ítem de mercadería?')) return;
+      const { error } = await sb.from('cargo_items').delete().eq('id', id);
+      if (error) return alert('Error: ' + error.message);
+      await selectContainer(currentContainer);
+    }
+
+    // --- GENERADOR DE INVOICE ---
+    function openInvoiceModal(clientName) {
+      activeInvoiceClient = clientName;
+      document.getElementById('modal-invoice').classList.remove('hidden');
+      renderInvoicePreview();
+    }
+
+    function renderInvoicePreview() {
+      const items = currentCargoItems.filter(i => i.client_name.trim() === activeInvoiceClient);
+      const clientInfo = items[0] || {};
+      const incoterm = document.getElementById('inv-incoterm').value;
+      const freight = parseFloat(document.getElementById('inv-freight').value) || 0;
+      const subtotal = items.reduce((s, i) => s + Number(i.total_value), 0);
+      const grandTotal = subtotal + freight;
+      const today = new Date().toLocaleDateString('es-AR');
+      const invNumber = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      document.getElementById('invoice-print-area').innerHTML = `
+        <div class="flex justify-between items-start border-b-2 border-red-600 pb-6 mb-6">
+          <div>
+            <h1 class="text-2xl font-extrabold text-red-700">${companySettings.name || 'DE CHINA AL MUNDO'}</h1>
+            <p class="text-xs text-slate-500 font-semibold">${companySettings.subtitle || ''}</p>
+            <p class="text-xs text-slate-600 mt-2"><strong>China Warehouse:</strong> ${companySettings.china_warehouse || ''}</p>
+            <p class="text-xs text-slate-600"><strong>Argentina Office:</strong> ${companySettings.arg_warehouse || ''}</p>
+            <p class="text-xs text-slate-600"><strong>Email:</strong> ${companySettings.contact_email || ''} ${companySettings.tax_id ? '| <strong>Tax ID:</strong> ' + companySettings.tax_id : ''}</p>
+          </div>
+          <div class="text-right">
+            <h2 class="text-3xl font-black text-slate-800 tracking-tight">COMMERCIAL INVOICE</h2>
+            <p class="text-sm font-bold text-red-600 mt-1">N° ${invNumber}</p>
+            <p class="text-xs text-slate-500 mt-1">Date: <strong>${today}</strong></p>
+            <p class="text-xs text-slate-500">Incoterm: <strong>${incoterm}</strong></p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-6 text-xs">
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <p class="font-bold text-slate-400 uppercase mb-1">Consignee / Buyer (Cliente)</p>
+            <p class="text-sm font-bold text-slate-900">${activeInvoiceClient}</p>
+            ${clientInfo.client_tax_id ? `<p class="text-slate-600 mt-0.5">CUIT / Tax ID: ${clientInfo.client_tax_id}</p>` : ''}
+            ${clientInfo.client_address ? `<p class="text-slate-600 mt-0.5">${clientInfo.client_address}</p>` : ''}
+          </div>
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <p class="font-bold text-slate-400 uppercase mb-1">Shipment Details (Embarque)</p>
+            <p class="text-slate-700"><strong>Container:</strong> ${currentContainer.container_number} (${currentContainer.container_type})</p>
+            <p class="text-slate-700"><strong>Bill of Lading:</strong> ${currentContainer.bl_number || 'N/A'}</p>
+            <p class="text-slate-700"><strong>Route:</strong> ${currentContainer.pol} → ${currentContainer.pod}</p>
+            <p class="text-slate-700"><strong>Shipping Mark:</strong> ${clientInfo.shipping_mark || 'DE CHINA AL MUNDO'}</p>
+          </div>
+        </div>
+
+        <table class="w-full text-xs border-collapse mb-6">
+          <thead>
+            <tr class="bg-slate-800 text-white uppercase">
+              <th class="p-2.5 text-left">Description of Goods</th>
+              <th class="p-2.5 text-left">HS Code</th>
+              <th class="p-2.5 text-right">Pkgs</th>
+              <th class="p-2.5 text-right">G.W. (KG)</th>
+              <th class="p-2.5 text-right">CBM</th>
+              <th class="p-2.5 text-right">Unit Price</th>
+              <th class="p-2.5 text-right">Amount (USD)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 border-b border-slate-300">
+            ${items.map(i => `
+              <tr>
+                <td class="p-2.5 font-medium">${i.description}</td>
+                <td class="p-2.5 text-slate-600">${i.hs_code || '-'}</td>
+                <td class="p-2.5 text-right">${i.packages}</td>
+                <td class="p-2.5 text-right">${Number(i.gross_weight).toFixed(2)}</td>
+                <td class="p-2.5 text-right">${Number(i.cbm).toFixed(3)}</td>
+                <td class="p-2.5 text-right">$${Number(i.unit_price).toFixed(2)}</td>
+                <td class="p-2.5 text-right font-bold">$${Number(i.total_value).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="flex justify-between items-start">
+          <div class="w-1/2 text-xs text-slate-600">
+            <p class="font-bold text-slate-800 uppercase mb-1">Bank & Payment Details:</p>
+            <p class="whitespace-pre-line">${companySettings.bank_details || 'Consultar instrucciones de transferencia con ejecutivo de cuenta.'}</p>
+          </div>
+          <div class="w-64 text-xs space-y-1.5 bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div class="flex justify-between"><span>Subtotal (${incoterm}):</span><strong>USD ${subtotal.toFixed(2)}</strong></div>
+            ${freight > 0 ? `<div class="flex justify-between"><span>Freight / Charges:</span><strong>USD ${freight.toFixed(2)}</strong></div>` : ''}
+            <div class="flex justify-between text-sm font-black text-red-700 border-t border-slate-300 pt-2">
+              <span>TOTAL USD:</span><span>$${grandTotal.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function closeModals() {
+      document.getElementById('modal-container').classList.add('hidden');
+      document.getElementById('modal-cargo').classList.add('hidden');
+      document.getElementById('modal-invoice').classList.add('hidden');
+    }
+
+    init();
+  </script>
 </body>
 </html>
